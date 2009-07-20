@@ -9,6 +9,7 @@
 - passwords do no longer show up in error messages. Thanks Jens Seiffert.
 - fixed a bug in mode sql (numbers of the form .5 were rejected). Thanks Shane Jordan.
 - fixed a bug in sga-latches-hitratio (thresholds were ignored). Thanks Yannik Charton.
+- login parameter --user is now --username (--user still works)
 
 1.6.2 2009-04-04
 - fixed a bug in tablespace-usage and german localization

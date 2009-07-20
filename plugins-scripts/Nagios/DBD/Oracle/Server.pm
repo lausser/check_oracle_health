@@ -38,7 +38,7 @@ sub new {
   my $self = {
     access => $params{method} || "dbi",
     connect => $params{connect},
-    user => $params{user},
+    username => $params{username},
     password => $params{password},
     timeout => $params{timeout},
     warningrange => $params{warningrange},
@@ -630,7 +630,7 @@ sub new {
     timeout => $params{timeout},
     access => $params{method} || "dbi",
     connect => $params{connect},
-    user => $params{user},
+    username => $params{username},
     password => $params{password},
     tnsadmin => $ENV{TNS_ADMIN},
     oraclehome => $ENV{ORACLE_HOME},
@@ -668,24 +668,24 @@ sub init {
       $self->{errstr} = "Please specify a database";
     } else {
       $self->{sid} = $self->{connect};
-      $self->{user} ||= time;  # prefer an existing user
+      $self->{username} ||= time;  # prefer an existing user
       $self->{password} = time;
     }
   } else {
-    if (! $self->{connect} || ! $self->{user} || ! $self->{password}) {
+    if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
       if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@(\w+)/) {
         $self->{connect} = $3;
-        $self->{user} = $1;
+        $self->{username} = $1;
         $self->{password} = $2;
         $self->{sid} = $self->{connect};
-      } elsif ($self->{connect} && ! $self->{user} && ! $self->{password}) {
+      } elsif ($self->{connect} && ! $self->{username} && ! $self->{password}) {
         # maybe this is a os authenticated user
         delete $ENV{TWO_TASK};
         $self->{sid} = $self->{connect};
         if ($^O ne "hpux") {       #hpux && 1.21 only accepts "DBI:Oracle:SID"
           $self->{connect} = "";   #linux 1.20 only accepts "DBI:Oracle:" + ORACLE_SID
         }
-        $self->{user} = '/';
+        $self->{username} = '/';
         $self->{password} = "";
       } else {
         $self->{errstr} = "Please specify database, username and password";
@@ -709,14 +709,14 @@ sub init {
       my $oldaction = POSIX::SigAction->new();
       sigaction(SIGALRM ,$action ,$oldaction );
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
-      my $connecthash = $self->{user} eq "sys" ?
+      my $connecthash = $self->{username} eq "sys" ?
           { RaiseError => 0, AutoCommit => 0, PrintError => 0,
               #ora_session_mode => DBD::Oracle::ORA_SYSDBA  } :
               ora_session_mode => 0x0002  } :
           { RaiseError => 0, AutoCommit => 0, PrintError => 0 };
       if ($self->{handle} = DBI->connect(
           sprintf("DBI:Oracle:%s", $self->{connect}),
-          $self->{user},
+          $self->{username},
           $self->{password},
           $connecthash)) {
         $self->{handle}->do(q{
@@ -906,31 +906,31 @@ sub init {
       $self->{errstr} = "Please specify a database";
     } else {
       $self->{sid} = $self->{connect};
-      $self->{user} ||= time;  # prefer an existing user
+      $self->{username} ||= time;  # prefer an existing user
       $self->{password} = time;
     }
   } else {
-    if ($self->{connect} && ! $self->{user} && ! $self->{password} &&
+    if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
         $self->{connect} =~ /(\w+)\/(\w+)@(\w+)/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
-      $self->{user} = $1;
+      $self->{username} = $1;
       $self->{password} = $2;
       $self->{sid} = $self->{connect};
-      if ($self->{user} eq "sys") {
+      if ($self->{username} eq "sys") {
         delete $ENV{TWO_TASK};
         $self->{loginstring} = "sys";
       } else {
         $self->{loginstring} = "traditional";
       }
-    } elsif ($self->{connect} && ! $self->{user} && ! $self->{password} &&
+    } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
         $self->{connect} =~ /sysdba@(\w+)/) {
       # --connect sysdba@bba
       $self->{connect} = $1;
-      $self->{user} = "/";
+      $self->{username} = "/";
       $self->{sid} = $self->{connect};
       $self->{loginstring} = "sysdba";
-    } elsif ($self->{connect} && ! $self->{user} && ! $self->{password} &&
+    } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
         $self->{connect} =~ /(\w+)/) {
       # --connect bba
       $self->{connect} = $1;
@@ -940,24 +940,24 @@ sub init {
       if ($^O ne "hpux") {       #hpux && 1.21 only accepts "DBI:Oracle:SID"
         $self->{connect} = "";   #linux 1.20 only accepts "DBI:Oracle:" + ORACLE_SID
       }
-      $self->{user} = '/';
+      $self->{username} = '/';
       $self->{password} = "";
       $self->{loginstring} = "extauth";
-    } elsif ($self->{user} &&
-        $self->{user} =~ /^\/@(\w+)/) {
+    } elsif ($self->{username} &&
+        $self->{username} =~ /^\/@(\w+)/) {
       # --user /@ubba1
-      $self->{user} = $1;
+      $self->{username} = $1;
       $self->{sid} = $self->{connect};
       $self->{loginstring} = "passwordstore";
-    } elsif ($self->{connect} && $self->{user} && ! $self->{password} &&
-        $self->{user} eq "sysdba") {
+    } elsif ($self->{connect} && $self->{username} && ! $self->{password} &&
+        $self->{username} eq "sysdba") {
       # --connect bba --user sysdba
       $self->{connect} = $1;
-      $self->{user} = "/";
+      $self->{username} = "/";
       $self->{sid} = $self->{connect};
       $self->{loginstring} = "sysdba";
-    } elsif ($self->{connect} && $self->{user} && $self->{password}) {
-      # --connect bba --user nagios --password oradbmon
+    } elsif ($self->{connect} && $self->{username} && $self->{password}) {
+      # --connect bba --username nagios --password oradbmon
       $self->{sid} = $self->{connect};
       $self->{loginstring} = "traditional";
     } else {
@@ -991,27 +991,27 @@ sub init {
         if ($self->{loginstring} eq "traditional") {
           $self->{sqlplus} = sprintf "%s -S %s/%s@%s < /dev/null",
               $sqlplus,
-              $self->{user}, $self->{password}, $self->{sid};
+              $self->{username}, $self->{password}, $self->{sid};
         } elsif ($self->{loginstring} eq "extauth") {
           $self->{sqlplus} = sprintf "%s -S / < /dev/null",
               $sqlplus;
         } elsif ($self->{loginstring} eq "passwordstore") {
           $self->{sqlplus} = sprintf "%s -S /@%s < /dev/null",
               $sqlplus,
-              $self->{user};
+              $self->{username};
         } elsif ($self->{loginstring} eq "sysdba") {
           $self->{sqlplus} = sprintf "%s -S / as sysdba < /dev/null",
               $sqlplus;
         } elsif ($self->{loginstring} eq "sys") {
           $self->{sqlplus} = sprintf "%s -S %s/%s@%s as sysdba < /dev/null",
               $sqlplus,
-              $self->{user}, $self->{password}, $self->{sid};
+              $self->{username}, $self->{password}, $self->{sid};
         }
       } else {
         if ($self->{loginstring} eq "traditional") {
           $self->{sqlplus} = sprintf "%s -S %s/%s@%s < %s > %s",
               $sqlplus,
-              $self->{user}, $self->{password}, $self->{sid},
+              $self->{username}, $self->{password}, $self->{sid},
               $self->{sql_commandfile}, $self->{sql_resultfile};
         } elsif ($self->{loginstring} eq "extauth") {
           $self->{sqlplus} = sprintf "%s -S / < %s > %s",
@@ -1020,7 +1020,7 @@ sub init {
         } elsif ($self->{loginstring} eq "passwordstore") {
           $self->{sqlplus} = sprintf "%s -S /@%s < %s > %s",
               $sqlplus,
-              $self->{user},
+              $self->{username},
               $self->{sql_commandfile}, $self->{sql_resultfile};
         } elsif ($self->{loginstring} eq "sysdba") {
           $self->{sqlplus} = sprintf "%s -S / as sysdba < %s > %s",
@@ -1029,7 +1029,7 @@ sub init {
         } elsif ($self->{loginstring} eq "sys") {
           $self->{sqlplus} = sprintf "%s -S %s/%s@%s as sysdba < %s > %s",
               $sqlplus,
-              $self->{user}, $self->{password}, $self->{sid},
+              $self->{username}, $self->{password}, $self->{sid},
               $self->{sql_commandfile}, $self->{sql_resultfile};
         }
       }
@@ -1267,15 +1267,15 @@ sub init {
       }
     }
   } else {
-    if (! $self->{connect} || ! $self->{user} || ! $self->{password}) {
+    if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
       if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\.\w]+):(\d+)/) {
-        $self->{user} = $1;
+        $self->{username} = $1;
         $self->{password} = $2;
         $self->{host} = $3; 
         $self->{port} = $4;
         $self->{socket} = "";
       } elsif ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\.\w]+):([\w\/]+)/) {
-        $self->{user} = $1;
+        $self->{username} = $1;
         $self->{password} = $2;
         $self->{host} = $3; 
         $self->{socket} = $4;
@@ -1314,7 +1314,7 @@ sub init {
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       if ($self->{handle} = DBI->connect(
           sprintf("DBI:SQLRelay:host=%s;port=%d;socket=%s", $self->{host}, $self->{port}, $self->{socket}),
-          $self->{user},
+          $self->{username},
           $self->{password},
           { RaiseError => 1, AutoCommit => 0, PrintError => 1 })) {
         $self->{handle}->do(q{

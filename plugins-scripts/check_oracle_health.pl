@@ -180,7 +180,7 @@ sub print_usage () {
   print <<EOUS;
   Usage:
     $PROGNAME [-v] [-t <timeout>] --connect=<connect string>
-        --user=<username> --password=<password> --mode=<mode>
+        --username=<username> --password=<password> --mode=<mode>
         --tablespace=<tablespace>
     $PROGNAME [-h | --help]
     $PROGNAME [-V | --version]
@@ -188,7 +188,7 @@ sub print_usage () {
   Options:
     --connect
        the connect string
-    --user
+    --username
        the oracle user
     --password
        the oracle user's password
@@ -294,7 +294,7 @@ my @params = (
     "verbose|v",
     "debug|d",
     "connect|c=s",
-    "user|u=s",
+    "username|u=s",
     "password|p=s",
     "mode|m=s",
     "tablespace=s",
@@ -504,7 +504,7 @@ my %params = (
         $ENV{NAGIOS__SERVICEORACLE_SID} ||
         $ENV{NAGIOS__HOSTORACLE_SID} ||
         $ENV{ORACLE_SID},
-    user => $commandline{user} || 
+    username => $commandline{username} || 
         $ENV{NAGIOS__SERVICEORACLE_USER} ||
         $ENV{NAGIOS__HOSTORACLE_USER},
     password => $commandline{password} || 
