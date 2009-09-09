@@ -3,6 +3,7 @@
 ###############################################
 
 1.6.3 2009-09-09
+- optimized tablespace-can-allocate-next
 - added more tracing.
 - fixed a bug which caused invalid statefile names. Thanks Franky van Liedekerke
 - fixed a bug in tablespace-usage for Oracle 8.1.x

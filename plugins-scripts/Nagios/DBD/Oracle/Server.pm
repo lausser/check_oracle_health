@@ -682,7 +682,7 @@ sub init {
         $self->{sid} = $self->{connect};
       } elsif ($self->{connect} && $self->{connect} =~ /^(sys|sysdba)@(\w+)/) {
         $self->{connect} = $2;
-        $self->{user} = $1;
+        $self->{username} = $1;
         $self->{password} = '';
         $self->{sid} = $self->{connect};
       } elsif ($self->{connect} && ! $self->{username} && ! $self->{password}) {
@@ -718,7 +718,7 @@ sub init {
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
       my $connecthash = { RaiseError => 0, AutoCommit => 0, PrintError => 0 };
-      if ($self->{user} eq "sys" || $self->{user} eq "sysdba") {
+      if ($self->{username} eq "sys" || $self->{username} eq "sysdba") {
         $connecthash = { RaiseError => 0, AutoCommit => 0, PrintError => 0,
               #ora_session_mode => DBD::Oracle::ORA_SYSDBA   
               ora_session_mode => 0x0002  };

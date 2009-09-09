@@ -51,18 +51,6 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
               b.tablespace_name "Tablespace",
               b.segment_type "Type",
               SUBSTR(ext.owner||'.'||ext.segment_name,1,50) "Object Name",
-              -- ext.extent_id "ID", -- das zuletzt hinzugefuegte extent
-              -- fliegt raus
-              --TO_CHAR(
-              --  DECODE(freespace.extent_management,
-              --    'DICTIONARY', DECODE(b.extents, 
-              --      1, b.next_extent, ext.bytes * (1 + b.pct_increase / 100)),
-              --    'LOCAL', DECODE(freespace.allocation_type,
-              --      'UNIFORM', freespace.initial_extent, 
-              --      'SYSTEM', ext.bytes))
-              --    / 1024, '9,999,999,999') "Required Extent(K)",
-              --TO_CHAR(
-              --  freespace.largest / 1024, '9,999,999,999') "MaxAvail K"
               DECODE(freespace.extent_management, 
                 'DICTIONARY', DECODE(b.extents, 
                   1, b.next_extent, ext.bytes * (1 + b.pct_increase / 100)),
@@ -72,8 +60,26 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
               ) "Required Extent",
               freespace.largest "MaxAvail"
           FROM
-              dba_segments b,
-              dba_extents ext,
+              -- dba_segments b,
+              -- dba_extents ext,
+              (
+                SELECT
+                    owner, segment_type, segment_name, extents, pct_increase,
+                    next_extent, tablespace_name
+                FROM
+                    dba_segments
+                WHERE
+                    tablespace_name = ?
+              ) b,
+              (
+                SELECT
+                    owner, segment_type, segment_name, extent_id, bytes,
+                    tablespace_name
+                FROM
+                    dba_extents
+                WHERE
+                    tablespace_name = ?
+              ) ext,
               (
                 -- dictionary/local, uniform/system, initial, next
                 -- und der groesste freie extent pro tablespace
@@ -113,19 +119,11 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
               b.tablespace_name = freespace.tablespace_name
           AND
               freespace.tablespace_name = ?
-          --AND
-          --    DECODE(freespace.Extent_Management,
-          --      'DICTIONARY', DECODE(b.extents,
-          --        1, b.next_extent, ext.bytes * (1 + b.pct_increase / 100)),
-          --      'LOCAL', DECODE(freespace.allocation_type,
-          --        'UNIFORM', freespace.initial_extent,
-          --        'SYSTEM', ext.bytes)
-          --    ) > freespace.largest
           ORDER BY
               b.tablespace_name,
               b.segment_type,
               b.segment_name
-      }, $params{tablespace});
+      }, $params{tablespace}, $params{tablespace}, $params{tablespace});
       foreach (@tablespaceresult) {
         my ($tablespace_name, $segment_type, $object_name, 
             $required_for_next_extent, $largest_free) = @{$_};
