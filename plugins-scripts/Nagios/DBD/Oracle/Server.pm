@@ -732,6 +732,10 @@ sub init {
         $self->{handle}->do(q{
             ALTER SESSION SET NLS_NUMERIC_CHARACTERS=".," });
         $retval = $self;
+        if ($self->{mode} =~ /^server::tnsping/) {
+          $self->{handle}->disconnect();
+          die "ORA-01017"; # fake a successful connect with wrong password
+        }
       } else {
         $self->{errstr} = DBI::errstr();
       }
