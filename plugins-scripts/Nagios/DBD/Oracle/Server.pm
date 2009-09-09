@@ -368,6 +368,8 @@ sub dbconnect {
     } else {
       if ($self->{connect} =~ /^(.*?)\/(.*)@(.*)$/) {
         $self->{connect} = sprintf "%s/***@%s", $1, $3;
+      } elsif ($self->{connect} =~ /^(.*?)@(.*)$/) {
+        $self->{connect} = sprintf "%s@%s", $1, $2;
       }
       $self->add_nagios($ERRORS{CRITICAL},
           sprintf "cannot connect to %s. %s",
@@ -669,7 +671,7 @@ sub init {
     } else {
       $self->{sid} = $self->{connect};
       $self->{username} ||= time;  # prefer an existing user
-      $self->{password} = time;
+      $self->{password} ||= time;
     }
   } else {
     if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
@@ -677,6 +679,11 @@ sub init {
         $self->{connect} = $3;
         $self->{username} = $1;
         $self->{password} = $2;
+        $self->{sid} = $self->{connect};
+      } elsif ($self->{connect} && $self->{connect} =~ /^(sys|sysdba)@(\w+)/) {
+        $self->{connect} = $2;
+        $self->{user} = $1;
+        $self->{password} = '';
         $self->{sid} = $self->{connect};
       } elsif ($self->{connect} && ! $self->{username} && ! $self->{password}) {
         # maybe this is a os authenticated user
@@ -709,13 +716,16 @@ sub init {
       my $oldaction = POSIX::SigAction->new();
       sigaction(SIGALRM ,$action ,$oldaction );
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
-      my $connecthash = $self->{username} eq "sys" ?
-          { RaiseError => 0, AutoCommit => 0, PrintError => 0,
-              #ora_session_mode => DBD::Oracle::ORA_SYSDBA  } :
-              ora_session_mode => 0x0002  } :
-          { RaiseError => 0, AutoCommit => 0, PrintError => 0 };
+      my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
+      my $connecthash = { RaiseError => 0, AutoCommit => 0, PrintError => 0 };
+      if ($self->{user} eq "sys" || $self->{user} eq "sysdba") {
+        $connecthash = { RaiseError => 0, AutoCommit => 0, PrintError => 0,
+              #ora_session_mode => DBD::Oracle::ORA_SYSDBA   
+              ora_session_mode => 0x0002  };
+        $dsn = sprintf "DBI:Oracle:";
+      }
       if ($self->{handle} = DBI->connect(
-          sprintf("DBI:Oracle:%s", $self->{connect}),
+          $dsn,
           $self->{username},
           $self->{password},
           $connecthash)) {
@@ -806,6 +816,7 @@ sub fetchrow_array {
   my @arguments = @_;
   my $sth = undef;
   my @row = ();
+  $self->trace(sprintf "fetchrow_array: %s", $sql);
   eval {
     $sth = $self->{handle}->prepare($sql);
     if (scalar(@arguments)) {
@@ -833,6 +844,7 @@ sub fetchall_array {
   my @arguments = @_;
   my $sth = undef;
   my $rows = undef;
+  $self->trace(sprintf "fetchall_array: %s", $sql);
   eval {
     $sth = $self->{handle}->prepare($sql);
     if (scalar(@arguments)) {
@@ -1094,6 +1106,7 @@ sub fetchrow_array {
   my @arguments = @_;
   my $sth = undef;
   my @row = ();
+  $self->trace(sprintf "fetchrow_array: %s", $sql);
   foreach (@arguments) {
     # replace the ? by the parameters
     if (/^\d+$/) {
@@ -1133,6 +1146,7 @@ sub fetchall_array {
   my @arguments = @_;
   my $sth = undef;
   my $rows = undef;
+  $self->trace(sprintf "fetchall_array: %s", $sql);
   foreach (@arguments) {
     # replace the ? by the parameters
     if (/^\d+$/) {

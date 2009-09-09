@@ -15,6 +15,8 @@ sub new {
     data_buffer => undef,
     shared_pool => undef,
     latches => undef,
+    warningrange => $params{warningrange},
+    criticalrange => $params{criticalrange},
   };
   bless $self, $class;
   $self->init(%params);
