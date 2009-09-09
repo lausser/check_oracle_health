@@ -817,6 +817,7 @@ sub fetchrow_array {
   my $sth = undef;
   my @row = ();
   $self->trace(sprintf "fetchrow_array: %s", $sql);
+  $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   eval {
     $sth = $self->{handle}->prepare($sql);
     if (scalar(@arguments)) {
@@ -845,6 +846,7 @@ sub fetchall_array {
   my $sth = undef;
   my $rows = undef;
   $self->trace(sprintf "fetchall_array: %s", $sql);
+  $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   eval {
     $sth = $self->{handle}->prepare($sql);
     if (scalar(@arguments)) {
@@ -1107,6 +1109,7 @@ sub fetchrow_array {
   my $sth = undef;
   my @row = ();
   $self->trace(sprintf "fetchrow_array: %s", $sql);
+  $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   foreach (@arguments) {
     # replace the ? by the parameters
     if (/^\d+$/) {
@@ -1147,6 +1150,7 @@ sub fetchall_array {
   my $sth = undef;
   my $rows = undef;
   $self->trace(sprintf "fetchall_array: %s", $sql);
+  $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   foreach (@arguments) {
     # replace the ? by the parameters
     if (/^\d+$/) {
@@ -1359,6 +1363,7 @@ sub fetchrow_array {
   my $sth = undef;
   my @row = ();
   $self->trace(sprintf "fetchrow_array: %s", $sql);
+  $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   eval {
     $sth = $self->{handle}->prepare($sql);
     if (scalar(@arguments)) {
@@ -1387,6 +1392,7 @@ sub fetchall_array {
   my $sth = undef;
   my $rows = undef;
   $self->trace(sprintf "fetchall_array: %s", $sql);
+  $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   eval {
     $sth = $self->{handle}->prepare($sql);
     if (scalar(@arguments)) {
