@@ -53,14 +53,31 @@ sub new {
   if ($self->dbconnect(%params)) {
     $self->{version} = $self->{handle}->fetchrow_array(
         q{ SELECT version FROM v$instance });
-    $self->{os} = $self->{handle}->fetchrow_array(
-        q{ SELECT dbms_utility.port_string FROM dual });
-    $self->{dbuser} = $self->{handle}->fetchrow_array(
-        q{ SELECT sys_context('userenv', 'session_user') FROM dual });
-    $self->{thread} = $self->{handle}->fetchrow_array(
-        q{ SELECT thread# FROM v$instance });
-    $self->{parallel} = $self->{handle}->fetchrow_array(
-        q{ SELECT parallel FROM v$instance });
+    if (! $self->{version}) {
+      # This is left over from a test with oracle 7.
+      # Just a reminder that it's basically possible to run this plugin
+      # against such a dinosaur. At least tablespace-usage works.
+      # The rest of the modes probably won't work. At least i didn't try it.
+      # Don't even ask me to have a look at it. You'll have to pay for it.
+      # And believe me, upgrading to a recent version of Oracle will be
+      # much more cheaper.
+      $self->{version} = $self->{handle}->fetchrow_array(
+          q{ SELECT version FROM product_component_version 
+               WHERE product LIKE '%Server%' });
+      $self->{os} = 'Unix';
+      $self->{dbuser} = $self->{username};
+      $self->{thread} = 1;
+      $self->{parallel} = 'no';
+    } else {
+      $self->{os} = $self->{handle}->fetchrow_array(
+          q{ SELECT dbms_utility.port_string FROM dual });
+      $self->{dbuser} = $self->{handle}->fetchrow_array(
+          q{ SELECT sys_context('userenv', 'session_user') FROM dual });
+      $self->{thread} = $self->{handle}->fetchrow_array(
+          q{ SELECT thread# FROM v$instance });
+      $self->{parallel} = $self->{handle}->fetchrow_array(
+          q{ SELECT parallel FROM v$instance });
+    }
     DBD::Oracle::Server::add_server($self);
     $self->init(%params);
   }
@@ -675,12 +692,12 @@ sub init {
     }
   } else {
     if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
-      if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@(\w+)/) {
+      if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\w\-]+)/) {
         $self->{connect} = $3;
         $self->{username} = $1;
         $self->{password} = $2;
         $self->{sid} = $self->{connect};
-      } elsif ($self->{connect} && $self->{connect} =~ /^(sys|sysdba)@(\w+)/) {
+      } elsif ($self->{connect} && $self->{connect} =~ /^(sys|sysdba)@([\w\-]+)/) {
         $self->{connect} = $2;
         $self->{username} = $1;
         $self->{password} = '';
@@ -834,6 +851,8 @@ sub fetchrow_array {
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
   }
+  $self->trace(sprintf "RESULT:\n%s\n",
+      Data::Dumper::Dumper(\@row));
   if (-f "/tmp/check_oracle_health_simulation/".$self->{mode}) {
     my $simulation = do { local (@ARGV, $/) = 
         "/tmp/check_oracle_health_simulation/".$self->{mode}; <> };
@@ -863,6 +882,8 @@ sub fetchall_array {
   if ($@) {
     printf STDERR "bumm %s\n", $@;
   }
+  $self->trace(sprintf "RESULT:\n%s\n",
+      Data::Dumper::Dumper($rows));
   if (-f "/tmp/check_oracle_health_simulation/".$self->{mode}) {
     my $simulation = do { local (@ARGV, $/) = 
         "/tmp/check_oracle_health_simulation/".$self->{mode}; <> };
@@ -919,6 +940,10 @@ sub init {
       tempfile($self->{mode}."XXXXX", SUFFIX => ".out", 
       DIR => $self->system_tmpdir() );
   close $self->{sql_resultfile_handle};
+  ($self->{sql_outfile_handle}, $self->{sql_outfile}) =
+      tempfile($self->{mode}."XXXXX", SUFFIX => ".out", 
+      DIR => $self->system_tmpdir() );
+  close $self->{sql_outfile_handle};
   if ($self->{mode} =~ /^server::tnsping/) {
     if (! $self->{connect}) {
       $self->{errstr} = "Please specify a database";
@@ -929,7 +954,7 @@ sub init {
     }
   } else {
     if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)\/(\w+)@(\w+)/) {
+        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-]+)/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
       $self->{username} = $1;
@@ -942,14 +967,14 @@ sub init {
         $self->{loginstring} = "traditional";
       }
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /sysdba@(\w+)/) {
+        $self->{connect} =~ /sysdba@([\w\-]+)/) {
       # --connect sysdba@bba
       $self->{connect} = $1;
       $self->{username} = "/";
       $self->{sid} = $self->{connect};
       $self->{loginstring} = "sysdba";
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)/) {
+        $self->{connect} =~ /([\w\-]+)/) {
       # --connect bba
       $self->{connect} = $1;
       # maybe this is a os authenticated user
@@ -962,7 +987,7 @@ sub init {
       $self->{password} = "";
       $self->{loginstring} = "extauth";
     } elsif ($self->{username} &&
-        $self->{username} =~ /^\/@(\w+)/) {
+        $self->{username} =~ /^\/@([\w\-]+)/) {
       # --user /@ubba1
       $self->{username} = $1;
       $self->{sid} = $self->{connect};
@@ -997,12 +1022,23 @@ sub init {
       # /u00/app/oracle/product/11.1.0/db_1/u00/app/oracle/product/11.1.0/db_1/bin/sqlplus 
       # draus gemacht. Leider nicht in Mini-Scripts reproduzierbar, sondern nur hier.
       # Das ist der Grund fuer die vielen ' und .
-      my $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
-      if ((-x $ENV{ORACLE_HOME}.'/'.'sqlplus') && ( -f $ENV{ORACLE_HOME}.'/'.'sqlplus')) {
-          $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus';
+      my $sqlplus = undef;
+      my $tnsping = undef;
+      if (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus') {
+        $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
+      } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus') {
+        $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus';
+      } elsif (-x '/usr/bin/sqlplus') {
+        $sqlplus = '/usr/bin/sqlplus';
       }
-      my $tnsping = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'tnsping';
-      if (! -x $sqlplus) {
+      if (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'tnsping') {
+        $tnsping = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'tnsping';
+      } elsif (-x $ENV{ORACLE_HOME}.'/'.'tnsping') {
+        $tnsping = $ENV{ORACLE_HOME}.'/'.'tnsping';
+      } elsif (-x '/usr/bin/tnsping') {
+        $tnsping = '/usr/bin/tnsping';
+      }
+      if (! $sqlplus) {
         die "nosqlplus\n";
       }
       if ($self->{mode} =~ /^server::tnsping/) {
@@ -1030,25 +1066,25 @@ sub init {
           $self->{sqlplus} = sprintf "%s -S %s/%s@%s < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
-              $self->{sql_commandfile}, $self->{sql_resultfile};
+              $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "extauth") {
           $self->{sqlplus} = sprintf "%s -S / < %s > %s",
               $sqlplus,
-              $self->{sql_commandfile}, $self->{sql_resultfile};
+              $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "passwordstore") {
           $self->{sqlplus} = sprintf "%s -S /@%s < %s > %s",
               $sqlplus,
               $self->{username},
-              $self->{sql_commandfile}, $self->{sql_resultfile};
+              $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "sysdba") {
           $self->{sqlplus} = sprintf "%s -S / as sysdba < %s > %s",
               $sqlplus,
-              $self->{sql_commandfile}, $self->{sql_resultfile};
+              $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "sys") {
           $self->{sqlplus} = sprintf "%s -S %s/%s@%s as sysdba < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
-              $self->{sql_commandfile}, $self->{sql_resultfile};
+              $self->{sql_commandfile}, $self->{sql_outfile};
         }
       }
   
@@ -1064,7 +1100,7 @@ sub init {
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
   
       if ($self->{mode} =~ /^server::tnsping/) {
-        if (-x $tnsping) {
+        if (! $tnsping) {
           my $exit_output = `$tnsping $self->{sid}`;
           if ($?) {
           #  printf STDERR "tnsping exit bumm \n";
@@ -1112,7 +1148,9 @@ sub fetchrow_array {
   my @arguments = @_;
   my $sth = undef;
   my @row = ();
+  $sql =~ s/%/%%/g; # sonst mault printf bei "...like '%xy%'"
   $self->trace(sprintf "fetchrow_array: %s", $sql);
+  $sql =~ s/%%/%/g;
   $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   foreach (@arguments) {
     # replace the ? by the parameters
@@ -1141,8 +1179,11 @@ sub fetchrow_array {
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
   }
+  $self->trace(sprintf "RESULT:\n%s\n",
+      Data::Dumper::Dumper(\@row));
   unlink $self->{sql_commandfile};
   unlink $self->{sql_resultfile};
+  unlink $self->{sql_outfile};
   return $row[0] unless wantarray;
   return @row;
 }
@@ -1153,7 +1194,9 @@ sub fetchall_array {
   my @arguments = @_;
   my $sth = undef;
   my $rows = undef;
+  $sql =~ s/%/%%/g; # sonst mault printf bei "...like '%xy%'"
   $self->trace(sprintf "fetchall_array: %s", $sql);
+  $sql =~ s/%%/%/g;
   $self->trace(sprintf "args: %s", Data::Dumper::Dumper(\@arguments));
   foreach (@arguments) {
     # replace the ? by the parameters
@@ -1189,8 +1232,11 @@ sub fetchall_array {
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
   }
+  $self->trace(sprintf "RESULT:\n%s\n",
+      Data::Dumper::Dumper($rows));
   unlink $self->{sql_commandfile};
   unlink $self->{sql_resultfile};
+  unlink $self->{sql_outfile};
   return @{$rows};
 }
 
@@ -1241,6 +1287,7 @@ sub DESTROY {
   $self->trace("try to clean up command and result files");
   unlink $self->{sql_commandfile} if -f $self->{sql_commandfile};
   unlink $self->{sql_resultfile} if -f $self->{sql_resultfile};
+  unlink $self->{sql_outfile} if -f $self->{sql_outfile};
 }
 
 sub create_commandfile {
@@ -1380,6 +1427,8 @@ sub fetchrow_array {
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
   }
+  $self->trace(sprintf "RESULT:\n%s\n",
+      Data::Dumper::Dumper(\@row));
   if (-f "/tmp/check_oracle_health_simulation/".$self->{mode}) {
     my $simulation = do { local (@ARGV, $/) =
         "/tmp/check_oracle_health_simulation/".$self->{mode}; <> };
@@ -1409,6 +1458,8 @@ sub fetchall_array {
   if ($@) {
     printf STDERR "bumm %s\n", $@;
   }
+  $self->trace(sprintf "RESULT:\n%s\n",
+      Data::Dumper::Dumper($rows));
   if (-f "/tmp/check_oracle_health_simulation/".$self->{mode}) {
     my $simulation = do { local (@ARGV, $/) =
         "/tmp/check_oracle_health_simulation/".$self->{mode}; <> };

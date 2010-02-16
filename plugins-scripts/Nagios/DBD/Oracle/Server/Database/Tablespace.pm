@@ -112,7 +112,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
             ORDER BY
                 1
         });
-      } else {
+      } elsif (DBD::Oracle::Server::return_first_server()->version_is_minimum("8.x")) {
         @tablespaceresult = $params{handle}->fetchall_array(q{
             SELECT
                 a.tablespace_name         "Tablespace",
@@ -181,6 +181,47 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
             ORDER BY
                 1
         });
+      } else {
+        @tablespaceresult = $params{handle}->fetchall_array(q{
+            SELECT
+                a.tablespace_name         "Tablespace",
+                b.status                  "Status",
+                b.contents                "Type",
+                'DICTIONARY'              "Extent Mgmt",
+                a.bytes                   bytes,
+                a.maxbytes                bytes_max,
+                c.bytes_free              bytes_free
+            FROM
+              (
+                -- belegter und maximal verfuegbarer platz pro datafile
+                -- nach tablespacenamen zusammengefasst
+                -- => bytes
+                -- => maxbytes
+                SELECT
+                    a.tablespace_name,
+                    SUM(a.bytes)          bytes,
+                    SUM(a.bytes) maxbytes
+                FROM
+                    dba_data_files a
+                GROUP BY
+                    tablespace_name
+              ) a,
+              sys.dba_tablespaces b,
+              (
+                -- freier platz pro tablespace
+                -- => bytes_free
+                SELECT
+                    a.tablespace_name,
+                    SUM(a.bytes) bytes_free
+                FROM
+                    dba_free_space a
+                GROUP BY
+                    tablespace_name
+              ) c
+            WHERE
+                a.tablespace_name = c.tablespace_name (+)
+                AND a.tablespace_name = b.tablespace_name
+        });
       }
       foreach (@tablespaceresult) {
         my ($name, $status, $type, $extentmgmt, $bytes, $bytes_max, $bytes_free) = @{$_};
@@ -189,6 +230,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
         } else {
           next if $params{selectname} && lc $params{selectname} ne lc $name;
         }
+        # host_filesys_pctAvailable
         my %thisparams = %params;
         $thisparams{name} = $name;
         $thisparams{bytes} = $bytes;
@@ -328,7 +370,6 @@ sub new {
     datafiles => [],
     io_total => 0,
     usage_history => [],
-    extent_management => $params{extent_management},
     allocation_type => $params{allocation_type},
     largest_free_extent => $params{largest_free_extent},
     warningrange => $params{warningrange},
