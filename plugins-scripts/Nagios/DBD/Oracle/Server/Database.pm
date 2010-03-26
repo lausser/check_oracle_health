@@ -18,6 +18,7 @@ sub new {
         invalid_objects => undef,
         invalid_indexes => undef,
         invalid_ind_partitions => undef,
+        invalid_registry_components => undef,
     },
     staleobjects => undef,
     tablespaces => [],
@@ -73,8 +74,16 @@ sub init_invalid_objects {
           FROM dba_ind_partitions 
           WHERE status <> 'USABLE'
       });
+  # should be only VALID
+  $self->{invalidobjects}->{invalid_registry_components} =
+      $self->{handle}->fetchrow_array(q{
+          SELECT COUNT(DISTINCT STATUS) 
+          FROM dba_registry
+          WHERE status <> 'VALID'
+      });
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
       ! defined $self->{invalidobjects}->{invalid_indexes} ||
+      ! defined $self->{invalidobjects}->{invalid_registry_components} ||
       ! defined $self->{invalidobjects}->{invalid_ind_partitions}) {
     $self->add_nagios_critical("unable to get invalid objects");
     return undef;
@@ -141,10 +150,14 @@ sub nagios {
       push(@message, sprintf "%d invalid index partitions",
           $self->{invalidobjects}->{invalid_ind_partitions}) if
           $self->{invalidobjects}->{invalid_ind_partitions};
+      push(@message, sprintf "%d invalid registry components",
+          $self->{invalidobjects}->{invalid_registry_components}) if
+          $self->{invalidobjects}->{invalid_registry_components};
       if (scalar(@message)) {
         $self->add_nagios($self->check_thresholds(
             $self->{invalidobjects}->{invalid_objects} +
             $self->{invalidobjects}->{invalid_indexes} +
+            $self->{invalidobjects}->{invalid_registry_components} +
             $self->{invalidobjects}->{invalid_ind_partitions}, 0.1, 0.1),
             join(", ", @message));
       } else {

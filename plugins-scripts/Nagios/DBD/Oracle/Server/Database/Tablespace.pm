@@ -357,6 +357,7 @@ sub new {
   my $class = shift;
   my %params = @_;
   my $self = {
+    verbose => $params{verbose},
     handle => $params{handle},
     name => $params{name},
     bytes => $params{bytes},
@@ -469,6 +470,8 @@ sub init {
         ($self->{bytes} - $self->{bytes_free}) / $self->{bytes_max} * 100;
     $self->{usage_history} = $self->load_state( %params ) || [];
     my $now = time;
+    my $lookback = ($params{lookback} || 30) * 24 * 3600;
+    #$lookback = 91 * 24 * 3600;
     if (scalar(@{$self->{usage_history}})) {
       $self->trace(sprintf "loaded %d data sets from     %s - %s", 
           scalar(@{$self->{usage_history}}),
@@ -476,7 +479,7 @@ sub init {
           scalar localtime($now));
       # only data sets with valid usage. only newer than 91 days
       $self->{usage_history} = 
-          [ grep { defined $_->[1] && ($now - $_->[0]) < 7862400 } @{$self->{usage_history}} ];
+          [ grep { defined $_->[1] && ($now - $_->[0]) < $lookback } @{$self->{usage_history}} ];
       $self->trace(sprintf "trimmed to %d data sets from %s - %s", 
           scalar(@{$self->{usage_history}}),
           scalar localtime((@{$self->{usage_history}})[0]->[0]),

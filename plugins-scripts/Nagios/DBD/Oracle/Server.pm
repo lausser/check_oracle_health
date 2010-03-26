@@ -407,6 +407,7 @@ sub trace {
   if ($self->{verbose}) {
     printf("%s: ", scalar localtime);
     printf($format, @_);
+    printf "\n";
   }
   if ($self->{trace}) {
     my $logfh = new IO::File;

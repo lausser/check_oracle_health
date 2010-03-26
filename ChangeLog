@@ -2,11 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
-1.
-- fixed a bug in method sqlplus with temporary files
-- sids may now contain a minus
-- --method sqlplus now also probes /usr/bin/sqlplus (Thanks Michael Prochaska)
-- For the necrophiles i implemented tablespace-usage with Oracle 7
+1.6.4 
+- added checking of dba_registry to mode invalid-objects. Thanks Ovidiu Marcu
+- speedup of tablespace-remaining-time. Thanks Steffen Poulsen
 
 1.6.3 2009-09-09
 - optimized tablespace-can-allocate-next
