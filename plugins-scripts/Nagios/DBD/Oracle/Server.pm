@@ -1044,7 +1044,7 @@ sub init {
       }
       if ($self->{mode} =~ /^server::tnsping/) {
         if ($self->{loginstring} eq "traditional") {
-          $self->{sqlplus} = sprintf "%s -S %s/%s@%s < /dev/null",
+          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" < /dev/null",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid};
         } elsif ($self->{loginstring} eq "extauth") {
@@ -1058,13 +1058,13 @@ sub init {
           $self->{sqlplus} = sprintf "%s -S / as sysdba < /dev/null",
               $sqlplus;
         } elsif ($self->{loginstring} eq "sys") {
-          $self->{sqlplus} = sprintf "%s -S %s/%s@%s as sysdba < /dev/null",
+          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" as sysdba < /dev/null",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid};
         }
       } else {
         if ($self->{loginstring} eq "traditional") {
-          $self->{sqlplus} = sprintf "%s -S %s/%s@%s < %s > %s",
+          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
               $self->{sql_commandfile}, $self->{sql_outfile};
@@ -1082,7 +1082,7 @@ sub init {
               $sqlplus,
               $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "sys") {
-          $self->{sqlplus} = sprintf "%s -S %s/%s@%s as sysdba < %s > %s",
+          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" as sysdba < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
               $self->{sql_commandfile}, $self->{sql_outfile};
