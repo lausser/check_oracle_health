@@ -43,6 +43,7 @@ sub new {
     timeout => $params{timeout},
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
+    ident => $params{ident},
     version => 'unknown',
     instance => undef,
     database => undef,
@@ -77,6 +78,14 @@ sub new {
           q{ SELECT thread# FROM v$instance });
       $self->{parallel} = $self->{handle}->fetchrow_array(
           q{ SELECT parallel FROM v$instance });
+      if ($self->{ident}) {
+        $self->{instance_name} = $self->{handle}->fetchrow_array(
+            q{ SELECT instance_name FROM v$instance });
+        $self->{database_name} = $self->{handle}->fetchrow_array(
+            q{ SELECT name FROM v$database });
+        $self->{identstring} = sprintf "inst: %s, db: %s",
+            $self->{instance_name}, $self->{database_name};
+      }
     }
     DBD::Oracle::Server::add_server($self);
     $self->init(%params);
@@ -329,6 +338,9 @@ sub merge_nagios {
 
 sub calculate_result {
   my $self = shift;
+  if (exists $self->{identstring}) {
+    $self->{nagios_message} .= $self->{identstring};
+  }
   if ($ENV{NRPE_MULTILINESUPPORT} && 
       length join(" ", @{$self->{nagios}->{perfdata}}) > 200) {
     foreach my $level ("CRITICAL", "WARNING", "UNKNOWN", "OK") {

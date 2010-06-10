@@ -175,15 +175,23 @@ sub nagios {
       if ($lastlevel) {
         # nachschauen, ob sich die situation schon entspannt hat
         if ($nextlevel == 2) {
-          # das riecht nach aerger. kann zwar auch daran liegen, weil der check unmittelbar nach deim kurzen switch
+          # das riecht nach aerger. kann zwar auch daran liegen, weil der check unmittelbar nach dem kurzen switch
           # ausgefuehrt wird, aber dann bleibts beim soft-hard und beim retry schauts schon besser aus.
-          $self->add_nagios(
-              # 10: minutes, 1: minute = 600:, 60:
-              $nextlevel,
-              sprintf "Last redo log file switch interval was %d minutes%s. Next interval presumably >%d minutes",
-                  $self->{last_switch_interval} / 60,
-                  $self->instance_rac() ? sprintf " (thread %d)", $self->instance_thread() : "",
-                  $self->{next_switch_interval} / 60);
+          if ($self->{next_switch_interval} < 0) {
+            # jetzt geht gar nichts mehr
+            $self->add_nagios(
+                2,
+                "Found a redo log with a timestamp in the future!!");
+            $self->{next_switch_interval} = 0;
+          } else {
+              $self->add_nagios(
+                  # 10: minutes, 1: minute = 600:, 60:
+                  $nextlevel,
+                  sprintf "Last redo log file switch interval was %d minutes%s. Next interval presumably >%d minutes",
+                      $self->{last_switch_interval} / 60,
+                      $self->instance_rac() ? sprintf " (thread %d)", $self->instance_thread() : "",
+                      $self->{next_switch_interval} / 60);
+          }
         } elsif ($nextlevel == 1) {
           # das kommt daher, weil retry_interval < warningthreshold
           if ($nexttolastlevel) {

@@ -221,6 +221,8 @@ EOUS
     --units
        one of %, KB, MB, GB. This is used for a better output of mode=sql
        and for specifying thresholds for mode=tablespace-free
+    --ident
+       outputs instance and database names
 
   Tablespace-related modes check all tablespaces in one run by default.
   If only a single tablespace should be checked, use the --name parameter.
@@ -317,6 +319,7 @@ my @params = (
     "eyecandy",
     "encode",
     "units=s",
+    "ident",
     "3");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -524,6 +527,7 @@ my %params = (
     units => $commandline{units},
     eyecandy => $commandline{eyecandy},
     statefilesdir => $STATEFILESDIR,
+    ident => $command{ident},
 );
 
 my $server = undef;

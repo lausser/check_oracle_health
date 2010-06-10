@@ -85,7 +85,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 AND a.tablespace_name = d.tablespace_name (+)
             UNION ALL
             SELECT
-                a.tablespace_name "Tablespace",
+                d.tablespace_name "Tablespace",
                 b.status "Status",
                 b.contents "Type",
                 b.extent_management "Extent Mgmt",
@@ -104,11 +104,10 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 and d.tablespace_name    = a.tablespace_name
                 and b.tablespace_name    = a.tablespace_name
             GROUP BY
-                a.tablespace_name,
                 b.status,
                 b.contents,
                 b.extent_management,
-                d.maxbytes
+                d.tablespace_name
             ORDER BY
                 1
         });

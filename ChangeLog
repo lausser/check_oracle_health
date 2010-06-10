@@ -5,6 +5,9 @@
 1.6.4 
 - added checking of dba_registry to mode invalid-objects. Thanks Ovidiu Marcu
 - speedup of tablespace-remaining-time. Thanks Steffen Poulsen
+- switch-interval detects redo log timestamps in the future and reports critical- method sqlplus now works with "(DESCRIPTION =(ADDRESS = (PROTOCOL = TCP"-like connectstrings
+- new parameter --ident to show instance and database names in the output
+- bugfix in tablespace-usage (temp tbs with multiple datafiles). Thanks Philipp Lemke
 
 1.6.3 2009-09-09
 - optimized tablespace-can-allocate-next
