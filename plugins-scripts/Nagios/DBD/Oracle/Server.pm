@@ -4,6 +4,7 @@ use strict;
 use Time::HiRes;
 use IO::File;
 use File::Copy 'cp';
+use Sys::Hostname;
 use Data::Dumper;
 
 my %ERRORS=( OK => 0, WARNING => 1, CRITICAL => 2, UNKNOWN => 3 );
@@ -83,8 +84,8 @@ sub new {
             q{ SELECT instance_name FROM v$instance });
         $self->{database_name} = $self->{handle}->fetchrow_array(
             q{ SELECT name FROM v$database });
-        $self->{identstring} = sprintf "inst: %s, db: %s",
-            $self->{instance_name}, $self->{database_name};
+        $self->{identstring} = sprintf "(host: %s inst: %s, db: %s) ",
+            hostname(), $self->{instance_name}, $self->{database_name};
       }
     }
     DBD::Oracle::Server::add_server($self);

@@ -527,7 +527,7 @@ my %params = (
     units => $commandline{units},
     eyecandy => $commandline{eyecandy},
     statefilesdir => $STATEFILESDIR,
-    ident => $command{ident},
+    ident => $commandline{ident},
 );
 
 my $server = undef;
