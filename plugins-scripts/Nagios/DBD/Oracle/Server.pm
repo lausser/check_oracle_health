@@ -946,16 +946,20 @@ sub init {
   my %params = @_;
   my $retval = undef;
   $self->{loginstring} = "traditional";
+  my $template = $self->{mode}.'XXXXX';
+  if ($^O =~ /MSWin/) {
+    $template =~ s/::/_/g;
+  }
   ($self->{sql_commandfile_handle}, $self->{sql_commandfile}) =
-      tempfile($self->{mode}."XXXXX", SUFFIX => ".sql", 
+      tempfile($template, SUFFIX => ".sql", 
       DIR => $self->system_tmpdir() );
   close $self->{sql_commandfile_handle};
   ($self->{sql_resultfile_handle}, $self->{sql_resultfile}) =
-      tempfile($self->{mode}."XXXXX", SUFFIX => ".out", 
+      tempfile($template, SUFFIX => ".out", 
       DIR => $self->system_tmpdir() );
   close $self->{sql_resultfile_handle};
   ($self->{sql_outfile_handle}, $self->{sql_outfile}) =
-      tempfile($self->{mode}."XXXXX", SUFFIX => ".out", 
+      tempfile($template, SUFFIX => ".out", 
       DIR => $self->system_tmpdir() );
   close $self->{sql_outfile_handle};
   if ($self->{mode} =~ /^server::tnsping/) {
@@ -1025,12 +1029,34 @@ sub init {
   if (! exists $self->{errstr}) {
     eval {
       $ENV{ORACLE_SID} = $self->{sid};
-      $ENV{PATH} = $ENV{ORACLE_HOME}."/bin".
-          (defined $ENV{PATH} ? 
-          ":".$ENV{PATH} : "");
-      $ENV{LD_LIBRARY_PATH} = $ENV{ORACLE_HOME}."/lib".
-          (defined $ENV{LD_LIBRARY_PATH} ? 
-          ":".$ENV{LD_LIBRARY_PATH} : "");
+      if (! exists $ENV{ORACLE_HOME}) {
+        if ($^O =~ /MSWin/) {
+          foreach my $path (split(';', $ENV{PATH})) {
+            if (-x $path.'/sqlplus.exe') {
+              $ENV{ORACLE_HOME} = $path;
+              last;
+            }
+          }
+        } else {
+          foreach my $path (split(':', $ENV{PATH})) {
+            if (-x $path.'/bin/sqlplus') {
+              $ENV{ORACLE_HOME} = $path;
+              last;
+            }
+          }
+        }
+        $ENV{ORACLE_HOME} |= '';
+      } else {
+        if ($^O =~ /MSWin/) {
+          $ENV{PATH} = $ENV{ORACLE_HOME}.
+              (defined $ENV{PATH} ? ";".$ENV{PATH} : "");
+        } else {
+          $ENV{PATH} = $ENV{ORACLE_HOME}."/bin".
+              (defined $ENV{PATH} ? ":".$ENV{PATH} : "");
+          $ENV{LD_LIBRARY_PATH} = $ENV{ORACLE_HOME}."/lib".
+              (defined $ENV{LD_LIBRARY_PATH} ? ":".$ENV{LD_LIBRARY_PATH} : "");
+        }
+      }
       # am 30.9.2008 hat perl das /bin/sqlplus in $ENV{ORACLE_HOME}.'/bin/sqlplus' 
       # eiskalt evaluiert und 
       # /u00/app/oracle/product/11.1.0/db_1/u00/app/oracle/product/11.1.0/db_1/bin/sqlplus 
@@ -1042,6 +1068,8 @@ sub init {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
       } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus') {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus';
+      } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus.exe') {
+        $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus.exe';
       } elsif (-x '/usr/bin/sqlplus') {
         $sqlplus = '/usr/bin/sqlplus';
       }
@@ -1049,6 +1077,8 @@ sub init {
         $tnsping = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'tnsping';
       } elsif (-x $ENV{ORACLE_HOME}.'/'.'tnsping') {
         $tnsping = $ENV{ORACLE_HOME}.'/'.'tnsping';
+      } elsif (-x $ENV{ORACLE_HOME}.'/'.'tnsping.exe') {
+        $tnsping = $ENV{ORACLE_HOME}.'/'.'tnsping.exe';
       } elsif (-x '/usr/bin/tnsping') {
         $tnsping = '/usr/bin/tnsping';
       }
@@ -1074,6 +1104,10 @@ sub init {
           $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" as sysdba < /dev/null",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid};
+        }
+        if ($^O =~ /MSWin/) {
+          #$self->{sqlplus} =~ s/ < \/dev\/null//g;
+          $self->{sqlplus} =~ s/ < \/dev\/null/ < NUL:/g; # works with powershell
         }
       } else {
         if ($self->{loginstring} eq "traditional") {
@@ -1104,17 +1138,19 @@ sub init {
   
       use POSIX ':signal_h';
       local $SIG{'ALRM'} = sub {
-        die "alarm\n";
+        die "timeout\n";
       };
-      my $mask = POSIX::SigSet->new( SIGALRM );
-      my $action = POSIX::SigAction->new(
-          sub { die "alarm\n" ; }, $mask);
-      my $oldaction = POSIX::SigAction->new();
-      sigaction(SIGALRM ,$action ,$oldaction );
+      if ($^O !~ /MSWin/) {
+        my $mask = POSIX::SigSet->new( SIGALRM );
+        my $action = POSIX::SigAction->new(
+            sub { die "alarm\n" ; }, $mask);
+        my $oldaction = POSIX::SigAction->new();
+        sigaction(SIGALRM ,$action ,$oldaction );
+      }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
   
       if ($self->{mode} =~ /^server::tnsping/) {
-        if (! $tnsping) {
+        if ($tnsping) {
           my $exit_output = `$tnsping $self->{sid}`;
           if ($?) {
           #  printf STDERR "tnsping exit bumm \n";

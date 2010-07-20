@@ -97,7 +97,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
            WHERE tablespace_name = UPPER(?)
            AND file_id=file# GROUP BY tablespace_name, file_name };
       }
-      my @datafileresults = $params{handle}->fetchall_array($sql, $params{selectname}, $params{selectname});
+      my @datafileresults = $params{handle}->fetchall_array($sql, $params{tablespace}, $params{tablespace});
       if (DBD::Oracle::Server::return_first_server()->windows_server()) {
         fileparse_set_fstype("MSWin32");
       }
