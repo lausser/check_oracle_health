@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.6.5 2010-07-20
+- plugin can now run on windows 
+
 1.6.4 
 - added checking of dba_registry to mode invalid-objects. Thanks Ovidiu Marcu
 - speedup of tablespace-remaining-time. Thanks Steffen Poulsen
