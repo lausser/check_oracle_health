@@ -71,19 +71,21 @@ sub new {
       $self->{thread} = 1;
       $self->{parallel} = 'no';
     } else {
-      $self->{os} = $self->{handle}->fetchrow_array(
-          q{ SELECT dbms_utility.port_string FROM dual });
-      $self->{dbuser} = $self->{handle}->fetchrow_array(
-          q{ SELECT sys_context('userenv', 'session_user') FROM dual });
-      $self->{thread} = $self->{handle}->fetchrow_array(
-          q{ SELECT thread# FROM v$instance });
-      $self->{parallel} = $self->{handle}->fetchrow_array(
-          q{ SELECT parallel FROM v$instance });
+      ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel}, $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(
+          q{ select dbms_utility.port_string,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
+      #$self->{os} = $self->{handle}->fetchrow_array(
+      #    q{ SELECT dbms_utility.port_string FROM dual });
+      #$self->{dbuser} = $self->{handle}->fetchrow_array(
+      #    q{ SELECT sys_context('userenv', 'session_user') FROM dual });
+      #$self->{thread} = $self->{handle}->fetchrow_array(
+      #    q{ SELECT thread# FROM v$instance });
+      #$self->{parallel} = $self->{handle}->fetchrow_array(
+      #    q{ SELECT parallel FROM v$instance });
       if ($self->{ident}) {
-        $self->{instance_name} = $self->{handle}->fetchrow_array(
-            q{ SELECT instance_name FROM v$instance });
-        $self->{database_name} = $self->{handle}->fetchrow_array(
-            q{ SELECT name FROM v$database });
+        #$self->{instance_name} = $self->{handle}->fetchrow_array(
+        #    q{ SELECT instance_name FROM v$instance });
+        #$self->{database_name} = $self->{handle}->fetchrow_array(
+        #    q{ SELECT name FROM v$database });
         $self->{identstring} = sprintf "(host: %s inst: %s, db: %s) ",
             hostname(), $self->{instance_name}, $self->{database_name};
       }
@@ -463,9 +465,14 @@ sub save_state {
     # just to be sure
     $params{connect} =~ s/\//_/g;
   }
+  my $mode = $params{mode};
+  if ($^O =~ /MSWin/) {
+    $mode =~ s/::/_/g;
+    $params{statefilesdir} = $self->system_vartmpdir();
+  }
   mkdir $params{statefilesdir} unless -d $params{statefilesdir};
   my $statefile = sprintf "%s/%s_%s", 
-      $params{statefilesdir}, $params{connect}, $params{mode};
+      $params{statefilesdir}, $params{connect}, $mode;
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";
   $extension .= $params{tablespace} ? "_".$params{tablespace} : "";
   $extension .= $params{datafile} ? "_".$params{datafile} : "";
@@ -496,8 +503,13 @@ sub load_state {
   } else {
     $params{connect} =~ s/\//_/g;
   }
+  my $mode = $params{mode};
+  if ($^O =~ /MSWin/) {
+    $mode =~ s/::/_/g;
+    $params{statefilesdir} = $self->system_vartmpdir();
+  }
   my $statefile = sprintf "%s/%s_%s", 
-      $params{statefilesdir}, $params{connect}, $params{mode};
+      $params{statefilesdir}, $params{connect}, $mode;
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";
   $extension .= $params{tablespace} ? "_".$params{tablespace} : "";
   $extension .= $params{datafile} ? "_".$params{datafile} : "";
@@ -665,6 +677,7 @@ sub new {
     connect => $params{connect},
     username => $params{username},
     password => $params{password},
+    verbose => $params{verbose},
     tnsadmin => $ENV{TNS_ADMIN},
     oraclehome => $ENV{ORACLE_HOME},
     handle => undef,
