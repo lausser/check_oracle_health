@@ -985,7 +985,7 @@ sub init {
     }
   } else {
     if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-]+)/) {
+        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
       $self->{username} = $1;
@@ -998,14 +998,14 @@ sub init {
         $self->{loginstring} = "traditional";
       }
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /sysdba@([\w\-]+)/) {
+        $self->{connect} =~ /sysdba@([\w\-\._]+)/) {
       # --connect sysdba@bba
       $self->{connect} = $1;
       $self->{username} = "/";
       $self->{sid} = $self->{connect};
       $self->{loginstring} = "sysdba";
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /([\w\-]+)/) {
+        $self->{connect} =~ /([\w\-\._]+)/) {
       # --connect bba
       $self->{connect} = $1;
       # maybe this is a os authenticated user
@@ -1018,7 +1018,7 @@ sub init {
       $self->{password} = "";
       $self->{loginstring} = "extauth";
     } elsif ($self->{username} &&
-        $self->{username} =~ /^\/@([\w\-]+)/) {
+        $self->{username} =~ /^\/@([\w\-\._]+)/) {
       # --user /@ubba1
       $self->{username} = $1;
       $self->{sid} = $self->{connect};

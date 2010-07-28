@@ -24,7 +24,8 @@ EXTRA_MODULES=\
   Nagios/DBD/Oracle/Server/Database/Tablespace/Segment.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace.pm \
   Nagios/DBD/Oracle/Server/Database.pm \
-  Nagios/DBD/Oracle/Server.pm
+  Nagios/DBD/Oracle/Server.pm \
+  Nagios/Extraopts.pm
 EXTRA_DIST=check_oracle_health.pl $(EXTRA_MODULES)
 
 CLEANFILES=$(libexec_SCRIPTS)
