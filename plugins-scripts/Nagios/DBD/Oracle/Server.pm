@@ -948,6 +948,7 @@ package DBD::Oracle::Server::Connection::Sqlplus;
 
 use strict;
 use File::Temp qw/tempfile/;
+use File::Basename qw/dirname/;
 
 our @ISA = qw(DBD::Oracle::Server::Connection);
 
@@ -1044,9 +1045,13 @@ sub init {
       $ENV{ORACLE_SID} = $self->{sid};
       if (! exists $ENV{ORACLE_HOME}) {
         if ($^O =~ /MSWin/) {
+          $self->trace("environment variable ORACLE_HOME is not set");
           foreach my $path (split(';', $ENV{PATH})) {
-            if (-x $path.'/sqlplus.exe') {
+            if (-x $path.'/'.'sqlplus.exe') {
               $ENV{ORACLE_HOME} = $path;
+              last;
+            } elsif (-x $path.'/'.'bin'.'/'.'sqlplus.exe') {
+              $ENV{ORACLE_HOME} = dirname($path);
               last;
             }
           }
@@ -1058,11 +1063,16 @@ sub init {
             }
           }
         }
-        $ENV{ORACLE_HOME} |= '';
+        if (! exists $ENV{ORACLE_HOME}) {
+          $ENV{ORACLE_HOME} |= '';
+        } else {
+          $self->trace("set ORACLE_HOME = ".$ENV{ORACLE_HOME});
+        }
       } else {
         if ($^O =~ /MSWin/) {
-          $ENV{PATH} = $ENV{ORACLE_HOME}.
+          $ENV{PATH} = $ENV{ORACLE_HOME}.';'.$ENV{ORACLE_HOME}.'/'.'bin'.
               (defined $ENV{PATH} ? ";".$ENV{PATH} : "");
+          $self->trace("set PATH = ".$ENV{PATH});
         } else {
           $ENV{PATH} = $ENV{ORACLE_HOME}."/bin".
               (defined $ENV{PATH} ? ":".$ENV{PATH} : "");
@@ -1081,6 +1091,8 @@ sub init {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
       } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus') {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus';
+      } elsif (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe') {
+        $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe';
       } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus.exe') {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus.exe';
       } elsif (-x '/usr/bin/sqlplus') {
