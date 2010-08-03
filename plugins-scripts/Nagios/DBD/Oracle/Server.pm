@@ -1082,7 +1082,7 @@ sub init {
         } else {
           $ENV{PATH} = $ENV{ORACLE_HOME}."/bin".
               (defined $ENV{PATH} ? ":".$ENV{PATH} : "");
-          $ENV{LD_LIBRARY_PATH} = $ENV{ORACLE_HOME}."/lib".
+          $ENV{LD_LIBRARY_PATH} = $ENV{ORACLE_HOME}."/lib".":".$ENV{ORACLE_HOME}.
               (defined $ENV{LD_LIBRARY_PATH} ? ":".$ENV{LD_LIBRARY_PATH} : "");
         }
       }
