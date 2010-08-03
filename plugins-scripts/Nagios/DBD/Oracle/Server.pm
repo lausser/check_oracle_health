@@ -1047,6 +1047,7 @@ sub init {
         if ($^O =~ /MSWin/) {
           $self->trace("environment variable ORACLE_HOME is not set");
           foreach my $path (split(';', $ENV{PATH})) {
+            $self->trace(sprintf "try to find sqlplus.exe in %s[/bin]", $path);
             if (-x $path.'/'.'sqlplus.exe') {
               $ENV{ORACLE_HOME} = $path;
               last;
@@ -1087,6 +1088,13 @@ sub init {
       # Das ist der Grund fuer die vielen ' und .
       my $sqlplus = undef;
       my $tnsping = undef;
+      $self->trace(sprintf "ORACLE_HOME is now %s", $ENV{ORACLE_HOME});
+      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus');
+      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus');
+      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe');
+      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus.exe');
+      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus.exe');
+      $self->trace(sprintf "try to find %s", '/usr/bin/sqlplus');
       if (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus') {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
       } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus') {
