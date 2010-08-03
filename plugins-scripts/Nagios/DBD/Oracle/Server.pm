@@ -1047,19 +1047,24 @@ sub init {
         if ($^O =~ /MSWin/) {
           $self->trace("environment variable ORACLE_HOME is not set");
           foreach my $path (split(';', $ENV{PATH})) {
-            $self->trace(sprintf "try to find sqlplus.exe in %s[/bin]", $path);
+            $self->trace(sprintf "try to find sqlplus.exe in %s", $path);
             if (-x $path.'/'.'sqlplus.exe') {
-              $ENV{ORACLE_HOME} = $path;
-              last;
-            } elsif (-x $path.'/'.'bin'.'/'.'sqlplus.exe') {
-              $ENV{ORACLE_HOME} = dirname($path);
+              if ($path =~ /[\\\/]bin[\\\/]*$/) {
+                $ENV{ORACLE_HOME} = dirname($path);
+              } else {
+                $ENV{ORACLE_HOME} = $path;
+              }
               last;
             }
           }
         } else {
           foreach my $path (split(':', $ENV{PATH})) {
-            if (-x $path.'/bin/sqlplus') {
-              $ENV{ORACLE_HOME} = $path;
+            if (-x $path.'/sqlplus') {
+              if ($path =~ /[\/]bin[\/]*$/) {
+                $ENV{ORACLE_HOME} = dirname($path);
+              } else {
+                $ENV{ORACLE_HOME} = $path;
+              }
               last;
             }
           }
@@ -1093,7 +1098,6 @@ sub init {
       $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus');
       $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe');
       $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus.exe');
-      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus.exe');
       $self->trace(sprintf "try to find %s", '/usr/bin/sqlplus');
       if (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus') {
         $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
@@ -1117,6 +1121,8 @@ sub init {
       }
       if (! $sqlplus) {
         die "nosqlplus\n";
+      } else {
+        $self->trace(sprintf "found %s", $sqlplus);
       }
       if ($self->{mode} =~ /^server::tnsping/) {
         if ($self->{loginstring} eq "traditional") {
