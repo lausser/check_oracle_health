@@ -1094,20 +1094,20 @@ sub init {
       my $sqlplus = undef;
       my $tnsping = undef;
       $self->trace(sprintf "ORACLE_HOME is now %s", $ENV{ORACLE_HOME});
-      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus');
-      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus');
-      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe');
-      $self->trace(sprintf "try to find %s", $ENV{ORACLE_HOME}.'/'.'sqlplus.exe');
-      $self->trace(sprintf "try to find %s", '/usr/bin/sqlplus');
-      if (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus') {
-        $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus';
-      } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus') {
-        $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus';
-      } elsif (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe') {
-        $sqlplus = $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'sqlplus.exe';
-      } elsif (-x $ENV{ORACLE_HOME}.'/'.'sqlplus.exe') {
-        $sqlplus = $ENV{ORACLE_HOME}.'/'.'sqlplus.exe';
-      } elsif (-x '/usr/bin/sqlplus') {
+      my @attempts = ();
+      if ($^O =~ /MSWin/) {
+        @attempts = qw(bin/sqlplus.exe sqlplus.exe);
+      } else {
+        @attempts = qw(bin/sqlplus sqlplus);
+      }
+      foreach my $try (@attempts) {
+        $self->trace(sprintf "try to find %s/%s", $ENV{ORACLE_HOME}, $try);
+        if (-x $ENV{ORACLE_HOME}.'/'.$try && -f $ENV{ORACLE_HOME}.'/'.$try) {
+          $sqlplus = $ENV{ORACLE_HOME}.'/'.$try;
+        }
+      }
+      if (! $sqlplus && -x '/usr/bin/sqlplus') {
+        # last hope
         $sqlplus = '/usr/bin/sqlplus';
       }
       if (-x $ENV{ORACLE_HOME}.'/'.'bin'.'/'.'tnsping') {
