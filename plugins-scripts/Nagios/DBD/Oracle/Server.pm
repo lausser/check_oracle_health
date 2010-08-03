@@ -719,12 +719,12 @@ sub init {
     }
   } else {
     if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
-      if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\w\-]+)/) {
+      if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\.]+)/) {
         $self->{connect} = $3;
         $self->{username} = $1;
         $self->{password} = $2;
         $self->{sid} = $self->{connect};
-      } elsif ($self->{connect} && $self->{connect} =~ /^(sys|sysdba)@([\w\-]+)/) {
+      } elsif ($self->{connect} && $self->{connect} =~ /^(sys|sysdba)@([\w\-\.]+)/) {
         $self->{connect} = $2;
         $self->{username} = $1;
         $self->{password} = '';
