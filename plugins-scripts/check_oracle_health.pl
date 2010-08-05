@@ -321,6 +321,7 @@ my @params = (
     "units=s",
     "ident",
     "3",
+    "with-mymodules-dyn-dir=s",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -383,7 +384,11 @@ if (exists $commandline{method}) {
   $commandline{method} = "dbi";
 }
 
-$DBD::Oracle::Server::my_modules_dyn_dir = '#MYMODULES_DYN_DIR#';
+if (exists $commandline{'with-mymodules-dyn-dir'}) {
+  $DBD::Oracle::Server::my_modules_dyn_dir = $commandline{'with-mymodules-dyn-dir'};
+} else {
+  $DBD::Oracle::Server::my_modules_dyn_dir = '#MYMODULES_DYN_DIR#';
+}
 
 if (exists $commandline{environment}) {
   # if the desired environment variable values are different from
