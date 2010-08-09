@@ -40,6 +40,14 @@ sub init {
     } else {
       $self->add_nagios_critical("unable to aquire tablespace info");
     }
+  } elsif ($params{mode} =~ /server::database::flash_recovery_area/) {
+    DBD::Oracle::Server::Database::FlashRecoveryArea::init_flash_recovery_areas(%params);
+    if (my @flash_recovery_areas = 
+        DBD::Oracle::Server::Database::FlashRecoveryArea::return_flash_recovery_areas()) {
+      $self->{flash_recovery_areas} = \@flash_recovery_areas;
+    } else {
+      $self->add_nagios_critical("unable to aquire flash recovery area info");
+    }
   } elsif ($params{mode} =~ /server::database::invalidobjects/) {
     $self->init_invalid_objects(%params);
   } elsif ($params{mode} =~ /server::database::stalestats/) {
@@ -135,6 +143,17 @@ sub nagios {
       $self->add_nagios_ok("have fun");
     } elsif ($params{mode} =~ /server::database::tablespace/) {
       foreach (@{$self->{tablespaces}}) {
+        # sind hier noch nach pctused sortiert
+        $_->nagios(%params);
+        $self->merge_nagios($_);
+      }
+    } elsif ($params{mode} =~ /server::database::tablespace::listflash_recovery_areas/) {
+      foreach (sort { $a->{name} cmp $b->{name}; }  @{$self->{flash_recovery_areas}}) {
+        printf "%s\n", $_->{name};
+      }
+      $self->add_nagios_ok("have fun");
+    } elsif ($params{mode} =~ /server::database::flash_recovery_area/) {
+      foreach (@{$self->{flash_recovery_areas}}) {
         # sind hier noch nach pctused sortiert
         $_->nagios(%params);
         $self->merge_nagios($_);

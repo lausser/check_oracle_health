@@ -21,6 +21,8 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
   }
   
   sub init_flash_recovery_areas {
+    # as far as i understand it, there is only one flra.
+    # we use an array here anyway, because the tablespace code can be reused
     my %params = @_;
     my $num_flash_recovery_areas = 0;
     if (($params{mode} =~ /server::database::flash_recovery_area::usage/) ||
@@ -104,14 +106,12 @@ sub nagios {
       $self->check_thresholds($self->{percent_used}, "90", "98");
       $self->add_nagios(
           $self->check_thresholds($self->{percent_used}, "90", "98"),
-                sprintf("tbs %s usage is %.2f%%",
+                sprintf("flra (%s) usage is %.2f%%",
                     $self->{name}, $self->{percent_used}));
-      $self->add_perfdata(sprintf "\'flra_%s_usage_pct\'=%.2f%%;%d;%d",
-          lc $self->{name},
+      $self->add_perfdata(sprintf "\'flra_usage_pct\'=%.2f%%;%d;%d",
           $self->{percent_used},
           $self->{warningrange}, $self->{criticalrange});
-      $self->add_perfdata(sprintf "\'flra_%s_usage\'=%dMB;%d;%d;%d;%d",
-          lc $self->{name},
+      $self->add_perfdata(sprintf "\'flra_usage\'=%dMB;%d;%d;%d;%d",
           ($self->{space_used} - $self->{space_reclaimable}) / 1048576,
           $self->{warningrange} * $self->{space_limit} / 100 / 1048576,
           $self->{criticalrange} * $self->{space_limit} / 100 / 1048576,
@@ -130,17 +130,15 @@ sub nagios {
       if ($params{units} eq "%") {
         $self->add_nagios(
             $self->check_thresholds($self->{percent_free}, "5:", "2:"),
-            sprintf("tbs %s has %.2f%% free space left",
+            sprintf("flra %s has %.2f%% free space left",
                 $self->{name}, $self->{percent_free})
         );
         $self->{warningrange} =~ s/://g;
         $self->{criticalrange} =~ s/://g;
-        $self->add_perfdata(sprintf "\'flra_%s_free_pct\'=%.2f%%;%d:;%d:",
-            lc $self->{name},
+        $self->add_perfdata(sprintf "\'flra_free_pct\'=%.2f%%;%d:;%d:",
             $self->{percent_free},
             $self->{warningrange}, $self->{criticalrange});
-        $self->add_perfdata(sprintf "\'flra_%s_free\'=%dMB;%.2f:;%.2f:;0;%.2f",
-            lc $self->{name},
+        $self->add_perfdata(sprintf "\'flra_free\'=%dMB;%.2f:;%.2f:;0;%.2f",
             $self->{bytes_free} / 1048576,
             $self->{warningrange} * $self->{space_limit} / 100 / 1048576,
             $self->{criticalrange} * $self->{space_limit} / 100 / 1048576,
@@ -171,19 +169,17 @@ sub nagios {
         $self->{criticalrange} .= ':';
         $self->add_nagios(
             $self->check_thresholds($self->{bytes_free}, "5242880:", "1048576:"),
-                sprintf("flra %s has %.2f%s free space left", $self->{name},
+                sprintf("flra %s has %.2f%s free space left",
                     $self->{bytes_free} / $factor, $params{units})
         );
         $self->{warningrange} = $saved_warningrange;
         $self->{criticalrange} = $saved_criticalrange;
         $self->{warningrange} =~ s/://g;
         $self->{criticalrange} =~ s/://g;
-        $self->add_perfdata(sprintf "\'flra_%s_free_pct\'=%.2f%%;%.2f:;%.2f:",
-            lc $self->{name},
+        $self->add_perfdata(sprintf "\'flra_free_pct\'=%.2f%%;%.2f:;%.2f:",
             $self->{percent_free}, $self->{percent_warning},
             $self->{percent_critical});
-        $self->add_perfdata(sprintf "\'flra_%s_free\'=%.2f%s;%.2f:;%.2f:;0;%.2f",
-            lc $self->{name},
+        $self->add_perfdata(sprintf "\'flra_free\'=%.2f%s;%.2f:;%.2f:;0;%.2f",
             $self->{bytes_free} / $factor, $params{units},
             $self->{warningrange},
             $self->{criticalrange},
