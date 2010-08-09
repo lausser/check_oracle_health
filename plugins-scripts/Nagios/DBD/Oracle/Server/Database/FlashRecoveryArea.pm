@@ -169,7 +169,7 @@ sub nagios {
         $self->{criticalrange} .= ':';
         $self->add_nagios(
             $self->check_thresholds($self->{bytes_free}, "5242880:", "1048576:"),
-                sprintf("flra %s has %.2f%s free space left",
+                sprintf("flra (%s) has %.2f%s free space left", $self->{name},
                     $self->{bytes_free} / $factor, $params{units})
         );
         $self->{warningrange} = $saved_warningrange;
