@@ -5,6 +5,7 @@
 1.6.5 2010-08-06
 - plugin can now run on windows 
 - --with-mymodules-dyn-dir on the commandline overrides the configure-option of the same name
+- added mode flash-recovery-area-[usage|free]
 
 1.6.4 
 - added checking of dba_registry to mode invalid-objects. Thanks Ovidiu Marcu
