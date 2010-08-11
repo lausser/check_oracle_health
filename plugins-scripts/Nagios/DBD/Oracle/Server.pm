@@ -388,14 +388,14 @@ sub set_db_thresholds {
       WHERE
           pluginmode = ?};
   eval {
-    if ($params{name} && $params{name2}) {
+    if ($params->{name} && $params->{name2}) {
       $sql .= q{ AND name = ? AND name2 = ?};
       ($warning, $critical) = 
-          $self->fetchrow_array($sql, $params{name}, $params{name2});
-    } elsif ($params{name}) {
+          $self->fetchrow_array($sql, $params->{name}, $params->{name2});
+    } elsif ($params->{name}) {
       $sql .= q{ AND name = ?};
       ($warning, $critical) = 
-          $self->fetchrow_array($sql, $params{name});
+          $self->fetchrow_array($sql, $params->{name});
     } else {
       ($warning, $critical) = 
           $self->fetchrow_array($sql);
