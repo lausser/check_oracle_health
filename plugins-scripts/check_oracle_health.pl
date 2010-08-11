@@ -523,6 +523,7 @@ my %params = (
            ( defined $_->[2] && grep { $commandline{mode} eq $_ } @{$_->[2]}) 
         } @modes
     )[0],
+    cmdlinemode => $commandline{mode},
     racmode => $racmode,
     method => $commandline{method} ||
         $ENV{NAGIOS__SERVICEORACLE_METH} ||

@@ -44,7 +44,6 @@ sub new {
     timeout => $params{timeout},
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
-    dbthresholds => $params{dbthresholds},
     ident => $params{ident},
     version => 'unknown',
     instance => undef,
@@ -390,15 +389,15 @@ sub set_db_thresholds {
   eval {
     if ($params->{name} && $params->{name2}) {
       $sql .= q{ AND name = ? AND name2 = ?};
-      ($warning, $critical) = 
-          $self->fetchrow_array($sql, $params->{name}, $params->{name2});
+      ($warning, $critical) = $self->{handle}->fetchrow_array(
+          $sql, $params->{cmdlinemode}, $params->{name}, $params->{name2});
     } elsif ($params->{name}) {
       $sql .= q{ AND name = ?};
-      ($warning, $critical) = 
-          $self->fetchrow_array($sql, $params->{name});
+      ($warning, $critical) = $self->{handle}->fetchrow_array(
+          $sql, $params->{cmdlinemode}, $params->{name});
     } else {
-      ($warning, $critical) = 
-          $self->fetchrow_array($sql);
+      ($warning, $critical) = $self->{handle}->fetchrow_array(
+          $sql, $params->{cmdlinemode});
     }
   };
   if (! $@) {
