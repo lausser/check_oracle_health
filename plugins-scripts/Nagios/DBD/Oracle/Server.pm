@@ -44,6 +44,7 @@ sub new {
     timeout => $params{timeout},
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
+    dbthresholds => $params{dbthresholds},
     ident => $params{ident},
     version => 'unknown',
     instance => undef,
@@ -100,6 +101,7 @@ sub init {
   my $self = shift;
   my %params = @_;
   $params{handle} = $self->{handle};
+  $self->set_db_thresholds() if $params{dbthresholds};
   if ($params{mode} =~ /^server::instance/) {
     $self->{instance} = DBD::Oracle::Server::Instance->new(%params);
   } elsif ($params{mode} =~ /^server::database/) {
@@ -369,6 +371,44 @@ sub calculate_result {
   foreach my $level ("OK", "UNKNOWN", "WARNING", "CRITICAL") {
     if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
       $self->{nagios_level} = $ERRORS{$level};
+    }
+  }
+}
+
+sub set_db_thresholds {
+  my $self = shift;
+  my $params = shift;
+  my $warning = undef;
+  my $critical = undef;
+  my $sql = q{
+      SELECT
+          warning, critical
+      FROM
+          check_oracle_health_thresholds
+      WHERE
+          pluginmode = ?};
+  eval {
+    if ($params{name} && $params{name2}) {
+      $sql .= q{ AND name = ? AND name2 = ?};
+      ($warning, $critical) = 
+          $self->fetchrow_array($sql, $params{name}, $params{name2});
+    } elsif ($params{name}) {
+      $sql .= q{ AND name = ?};
+      ($warning, $critical) = 
+          $self->fetchrow_array($sql, $params{name});
+    } else {
+      ($warning, $critical) = 
+          $self->fetchrow_array($sql);
+    }
+  };
+  if (! $@) {
+    if ($warning) {
+      $params->{warningrange} = $warning;
+      $self->trace("read warningthreshold %s from database", $warning);
+    }
+    if ($critical) {
+      $params->{criticalrange} = $critical;
+      $self->trace("read criticalthreshold %s from database", $critical);
     }
   }
 }
