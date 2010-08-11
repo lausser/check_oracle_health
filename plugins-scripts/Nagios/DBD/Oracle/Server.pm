@@ -44,6 +44,7 @@ sub new {
     timeout => $params{timeout},
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
+    verbose => $params{verbose},
     ident => $params{ident},
     version => 'unknown',
     instance => undef,
