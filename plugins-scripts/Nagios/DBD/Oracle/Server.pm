@@ -101,7 +101,7 @@ sub init {
   my $self = shift;
   my %params = @_;
   $params{handle} = $self->{handle};
-  $self->set_db_thresholds() if $params{dbthresholds};
+  $self->set_db_thresholds(\%params) if $params{dbthresholds};
   if ($params{mode} =~ /^server::instance/) {
     $self->{instance} = DBD::Oracle::Server::Instance->new(%params);
   } elsif ($params{mode} =~ /^server::database/) {
