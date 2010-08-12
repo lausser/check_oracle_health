@@ -380,25 +380,30 @@ sub set_db_thresholds {
   my $params = shift;
   my $warning = undef;
   my $critical = undef;
-  my $sql = q{
-      SELECT
-          warning, critical
-      FROM
-          check_oracle_health_thresholds
-      WHERE
-          pluginmode = ?};
   eval {
-    if ($params->{name} && $params->{name2}) {
-      $sql .= q{ AND name = ? AND name2 = ?};
-      ($warning, $critical) = $self->{handle}->fetchrow_array(
-          $sql, $params->{cmdlinemode}, $params->{name}, $params->{name2});
-    } elsif ($params->{name}) {
-      $sql .= q{ AND name = ?};
-      ($warning, $critical) = $self->{handle}->fetchrow_array(
-          $sql, $params->{cmdlinemode}, $params->{name});
-    } else {
-      ($warning, $critical) = $self->{handle}->fetchrow_array(
-          $sql, $params->{cmdlinemode});
+    if ($self->{handle}->fetchrow_array(q{
+        SELECT table_name FROM user_tables
+        WHERE table_name = 'CHECK_ORACLE_HEALTH_THRESHOLDS'
+      })) {
+      my $sql = q{
+          SELECT
+              warning, critical
+          FROM
+              check_oracle_health_thresholds
+          WHERE
+              pluginmode = ?};
+      if ($params->{name} && $params->{name2}) {
+        $sql .= q{ AND name = ? AND name2 = ?};
+        ($warning, $critical) = $self->{handle}->fetchrow_array(
+            $sql, $params->{cmdlinemode}, $params->{name}, $params->{name2});
+      } elsif ($params->{name}) {
+        $sql .= q{ AND name = ?};
+        ($warning, $critical) = $self->{handle}->fetchrow_array(
+            $sql, $params->{cmdlinemode}, $params->{name});
+      } else {
+        ($warning, $critical) = $self->{handle}->fetchrow_array(
+            $sql, $params->{cmdlinemode});
+      }
     }
   };
   if (! $@) {
