@@ -380,7 +380,7 @@ sub set_global_db_thresholds {
   my $params = shift;
   my $warning = undef;
   my $critical = undef;
-  return unless $params{dbthresholds};
+  return unless $params->{dbthresholds};
   eval {
     if ($self->{handle}->fetchrow_array(q{
         SELECT table_name FROM user_tables
