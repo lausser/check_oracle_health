@@ -384,6 +384,7 @@ sub init {
   my $self = shift;
   my %params = @_;
   $self->init_nagios();
+  $self->set_local_db_thresholds(%params);
   if ($params{mode} =~ /server::database::tablespace::(usage|free)/) {
     if (! defined $self->{bytes_max}) {
       $self->{bytes} = 0;

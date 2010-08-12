@@ -101,7 +101,7 @@ sub init {
   my $self = shift;
   my %params = @_;
   $params{handle} = $self->{handle};
-  $self->set_db_thresholds(\%params) if $params{dbthresholds};
+  $self->set_global_db_thresholds(\%params);
   if ($params{mode} =~ /^server::instance/) {
     $self->{instance} = DBD::Oracle::Server::Instance->new(%params);
   } elsif ($params{mode} =~ /^server::database/) {
@@ -189,7 +189,7 @@ sub nagios {
       $self->add_nagios(
           $self->check_thresholds($self->{connection_time}, 1, 5),
           sprintf "%.2f seconds to connect as %s",
-              $self->{connection_time}, $self->{dbuser});
+              $self->{connection_time}, $self->{dbuser}||$self->{username});
       $self->add_perfdata(sprintf "connection_time=%.4f;%d;%d",
           $self->{connection_time},
           $self->{warningrange}, $self->{criticalrange});
@@ -375,11 +375,12 @@ sub calculate_result {
   }
 }
 
-sub set_db_thresholds {
+sub set_global_db_thresholds {
   my $self = shift;
   my $params = shift;
   my $warning = undef;
   my $critical = undef;
+  return unless $params{dbthresholds};
   eval {
     if ($self->{handle}->fetchrow_array(q{
         SELECT table_name FROM user_tables
@@ -392,11 +393,7 @@ sub set_db_thresholds {
               check_oracle_health_thresholds
           WHERE
               pluginmode = ?};
-      if ($params->{name} && $params->{name2}) {
-        $sql .= q{ AND name = ? AND name2 = ?};
-        ($warning, $critical) = $self->{handle}->fetchrow_array(
-            $sql, $params->{cmdlinemode}, $params->{name}, $params->{name2});
-      } elsif ($params->{name}) {
+      if ($params->{name}) {
         $sql .= q{ AND name = ?};
         ($warning, $critical) = $self->{handle}->fetchrow_array(
             $sql, $params->{cmdlinemode}, $params->{name});
@@ -404,6 +401,9 @@ sub set_db_thresholds {
         ($warning, $critical) = $self->{handle}->fetchrow_array(
             $sql, $params->{cmdlinemode});
       }
+      $params->{dbthresholds} = [$self->{handle}->fetchall_array(q{
+          SELECT * FROM check_oracle_health_thresholds
+      })];
     }
   };
   if (! $@) {
@@ -414,6 +414,36 @@ sub set_db_thresholds {
     if ($critical) {
       $params->{criticalrange} = $critical;
       $self->trace("read criticalthreshold %s from database", $critical);
+    }
+  }
+}
+
+sub set_local_db_thresholds {
+  my $self = shift;
+  my %params = @_;
+  my $warning = undef;
+  my $critical = undef;
+  if (exists $params{dbthresholds}) {
+    foreach (@{$params{dbthresholds}}) {
+      if ($_->[0] eq $params{cmdlinemode}) {
+        if ((! defined $_->[1] ||
+            ! $_->[1]) && (! $warning || ! $critical)) {
+          ($warning, $critical) = ($_->[2], $_->[3]);
+        } elsif (defined $_->[1] &&
+            ($params{name} && $_->[1] eq $params{name})) {
+          ($warning, $critical) = ($_->[2], $_->[3]);
+        }
+      }
+    }
+    if ($warning) {
+      $self->{warningrange} = $warning;
+      $self->trace("read warningthreshold %s for %s from database", 
+         $self->{name}, $warning);
+    }
+    if ($critical) {
+      $self->{criticalrange} = $critical;
+      $self->trace("read criticalthreshold %s for %s from database", 
+          $self->{name}, $critical); 
     }
   }
 }
