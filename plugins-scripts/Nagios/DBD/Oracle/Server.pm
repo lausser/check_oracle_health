@@ -386,24 +386,16 @@ sub set_global_db_thresholds {
         SELECT table_name FROM user_tables
         WHERE table_name = 'CHECK_ORACLE_HEALTH_THRESHOLDS'
       })) {
-      my $sql = q{
-          SELECT
-              warning, critical
-          FROM
-              check_oracle_health_thresholds
-          WHERE
-              pluginmode = ?};
-      if ($params->{name}) {
-        $sql .= q{ AND name = ?};
-        ($warning, $critical) = $self->{handle}->fetchrow_array(
-            $sql, $params->{cmdlinemode}, $params->{name});
-      } else {
-        ($warning, $critical) = $self->{handle}->fetchrow_array(
-            $sql, $params->{cmdlinemode});
-      }
-      $params->{dbthresholds} = [$self->{handle}->fetchall_array(q{
+      my @dbthresholds = $self->{handle}->fetchall_array(q{
           SELECT * FROM check_oracle_health_thresholds
-      })];
+      });
+      $params->{dbthresholds} = \@dbthresholds;
+      foreach (@dbthresholds) {
+        if (($_->[0] eq $params->{cmdlinemode}) &&
+            (! defined $_->[1] || ! $_->[1])) {
+          ($warning, $critical) = ($_->[2], $_->[3]);
+        }
+      }
     }
   };
   if (! $@) {
@@ -423,13 +415,10 @@ sub set_local_db_thresholds {
   my %params = @_;
   my $warning = undef;
   my $critical = undef;
-  if (ref($params{dbthresholds}) eq 'HASH') {
+  if (ref($params{dbthresholds}) eq 'ARRAY') {
     foreach (@{$params{dbthresholds}}) {
       if ($_->[0] eq $params{cmdlinemode}) {
-        if ((! defined $_->[1] ||
-            ! $_->[1]) && (! $warning || ! $critical)) {
-          ($warning, $critical) = ($_->[2], $_->[3]);
-        } elsif (defined $_->[1] &&
+        if (defined $_->[1] &&
             ($params{name} && $_->[1] eq $params{name})) {
           ($warning, $critical) = ($_->[2], $_->[3]);
         }
