@@ -423,7 +423,7 @@ sub set_local_db_thresholds {
   my %params = @_;
   my $warning = undef;
   my $critical = undef;
-  if (exists $params{dbthresholds}) {
+  if (ref($params{dbthresholds}) eq 'HASH') {
     foreach (@{$params{dbthresholds}}) {
       if ($_->[0] eq $params{cmdlinemode}) {
         if ((! defined $_->[1] ||
