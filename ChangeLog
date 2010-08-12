@@ -2,7 +2,7 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
-1.6.6 2010-08-10
+1.6.6 2010-08-12
 - new parameter --dbthresholds. thresholds can now also be deposited in the table check_oracle_health_thresholds
 - bugfix in connection-time. dbuser was uninitialized in rare cases
 
