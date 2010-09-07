@@ -429,16 +429,20 @@ sub set_local_db_thresholds {
   # second: --name2
   # third: --name
   if (ref($params{dbthresholds}) eq 'ARRAY') {
+    my $marker;
     foreach (@{$params{dbthresholds}}) {
       if ($_->[0] eq $params{cmdlinemode}) {
         if (defined $_->[1] && $params{name0} && $_->[1] eq $params{name0}) {
           ($warning, $critical) = ($_->[2], $_->[3]);
+          $marker = $params{name0};
           last;
         } elsif (defined $_->[1] && $params{name2} && $_->[1] eq $params{name2}) {
           ($warning, $critical) = ($_->[2], $_->[3]);
+          $marker = $params{name2};
           last;
         } elsif (defined $_->[1] && $params{name} && $_->[1] eq $params{name}) {
           ($warning, $critical) = ($_->[2], $_->[3]);
+          $marker = $params{name};
           last;
         }
       }
@@ -446,12 +450,12 @@ sub set_local_db_thresholds {
     if ($warning) {
       $self->{warningrange} = $warning;
       $self->trace("read warningthreshold %s for %s from database", 
-         $self->{name}, $warning);
+         $marker, $warning);
     }
     if ($critical) {
       $self->{criticalrange} = $critical;
       $self->trace("read criticalthreshold %s for %s from database", 
-          $self->{name}, $critical); 
+          $marker, $critical); 
     }
   }
 }
