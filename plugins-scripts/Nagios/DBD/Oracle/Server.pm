@@ -107,6 +107,7 @@ sub init {
   } elsif ($params{mode} =~ /^server::database/) {
     $self->{database} = DBD::Oracle::Server::Database->new(%params);
   } elsif ($params{mode} =~ /^server::sql/) {
+    $self->set_local_db_thresholds(%params);
     @{$self->{genericsql}} =
         $self->{handle}->fetchrow_array($params{selectname});
     if (! (defined $self->{genericsql} &&
@@ -381,6 +382,10 @@ sub set_global_db_thresholds {
   my $warning = undef;
   my $critical = undef;
   return unless $params->{dbthresholds};
+  $params->{name0} = $params->{dbthresholds};
+  # :pluginmode   :name     :warning    :critical
+  # mode          empty
+  #
   eval {
     if ($self->{handle}->fetchrow_array(q{
         SELECT table_name FROM user_tables
@@ -415,12 +420,26 @@ sub set_local_db_thresholds {
   my %params = @_;
   my $warning = undef;
   my $critical = undef;
+  # :pluginmode   :name     :warning    :critical
+  # mode          name0
+  # mode          name2
+  # mode          name
+  #
+  # first: argument of --dbthresholds, it it exists
+  # second: --name2
+  # third: --name
   if (ref($params{dbthresholds}) eq 'ARRAY') {
     foreach (@{$params{dbthresholds}}) {
       if ($_->[0] eq $params{cmdlinemode}) {
-        if (defined $_->[1] &&
-            ($params{name} && $_->[1] eq $params{name})) {
+        if (defined $_->[1] && $params{name0} && $_->[1] eq $params{name0}) {
           ($warning, $critical) = ($_->[2], $_->[3]);
+          last;
+        } elsif (defined $_->[1] && $params{name2} && $_->[1] eq $params{name2}) {
+          ($warning, $critical) = ($_->[2], $_->[3]);
+          last;
+        } elsif (defined $_->[1] && $params{name} && $_->[1] eq $params{name}) {
+          ($warning, $critical) = ($_->[2], $_->[3]);
+          last;
         }
       }
     }
