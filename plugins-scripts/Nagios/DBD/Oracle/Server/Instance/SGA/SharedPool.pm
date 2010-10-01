@@ -69,8 +69,7 @@ sub init_shared_pool_reloads {
 sub init_shared_pool_free {
   my $self = shift;
   my %params = @_;
-  if (DBD::Oracle::Server::return_first_server()->version_is_minimum("9.x")
-      && ! DBD::Oracle::Server::return_first_server()->version_is_minimum("10.x")) {
+  if (DBD::Oracle::Server::return_first_server()->version_is_minimum("9.x") {
     $self->{free_percent} = $self->{handle}->fetchrow_array(q{
         SELECT ROUND(a.bytes / b.sm * 100,2) FROM
           (SELECT bytes FROM v$sgastat 
@@ -80,6 +79,7 @@ sub init_shared_pool_free {
                   (SELECT bytes FROM v$sgastat 
                       WHERE name='free memory' AND pool='shared pool')) b
   } else {
+    # i don't know if the above code works for 8.x, so i leave the old one here
     $self->{free_percent} = $self->{handle}->fetchrow_array(q{
         SELECT ROUND((SUM(DECODE(name, 'free memory', bytes, 0)) /
             SUM(bytes)) * 100,2) FROM v$sgastat where pool = 'shared pool'
