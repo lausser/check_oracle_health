@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.6.6.2 2010-11-11
+- better error message with method sqlplus when db is down
+
 1.6.6.1 2010-10-01
 - --dbthresholds can have an argument
 - workaround for an oracle-bug in shared-pool-free (Thanks Yannik)

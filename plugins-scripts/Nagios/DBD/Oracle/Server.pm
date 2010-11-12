@@ -1302,7 +1302,7 @@ sub init {
       } else {
         my $answer = $self->fetchrow_array(
             q{ SELECT 42 FROM dual});
-        die unless defined $answer and $answer == 42;
+        die $self->{errstr} unless defined $answer and $answer == 42;
       }
       $retval = $self;
     };
@@ -1339,8 +1339,7 @@ sub fetchrow_array {
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
-    printf STDERR "fetchrow_array exit bumm \n";
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
+    my $output = do { local (@ARGV, $/) = $self->{sql_outfile}; <> };
     my @oerrs = map {
       /(ORA\-\d+:.*)/ ? $1 : ();
     } split(/\n/, $output);
