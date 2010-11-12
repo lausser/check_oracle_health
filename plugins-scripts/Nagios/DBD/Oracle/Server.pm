@@ -1308,7 +1308,7 @@ sub init {
     };
     if ($@) {
       $self->{errstr} = $@;
-      $self->{errstr} =~ s/at $0 .*//g;
+      $self->{errstr} =~ s/at .* line \d+//g;
       chomp $self->{errstr};
       $retval = undef;
     }
