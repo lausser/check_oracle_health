@@ -108,16 +108,25 @@ sub init {
     $self->{database} = DBD::Oracle::Server::Database->new(%params);
   } elsif ($params{mode} =~ /^server::sql/) {
     $self->set_local_db_thresholds(%params);
-    @{$self->{genericsql}} =
-        $self->{handle}->fetchrow_array($params{selectname});
-    if (! (defined $self->{genericsql} &&
-        (scalar(grep { /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/ } @{$self->{genericsql}})) ==
-        scalar(@{$self->{genericsql}}))) {
-      $self->add_nagios_unknown(sprintf "got no valid response for %s",
-          $params{selectname});
+    if ($params{name2} && $params{name2} ne $params{name}) {
+      $self->{genericsql} =
+          $self->{handle}->fetchrow_array($params{selectname});
+      if (! defined $self->{genericsql}) {
+        $self->add_nagios_unknown(sprintf "got no valid response for %s",
+            $params{selectname});
+      }
     } else {
-      # name2 in array
-      # units in array
+      @{$self->{genericsql}} =
+          $self->{handle}->fetchrow_array($params{selectname});
+      if (! (defined $self->{genericsql} &&
+          (scalar(grep { /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/ } @{$self->{genericsql}})) ==
+          scalar(@{$self->{genericsql}}))) {
+        $self->add_nagios_unknown(sprintf "got no valid response for %s",
+            $params{selectname});
+      } else {
+        # name2 in array
+        # units in array
+      }
     }
   } elsif ($params{mode} =~ /^server::connectiontime/) {
     $self->{connection_time} = $self->{tac} - $self->{tic};
@@ -195,29 +204,51 @@ sub nagios {
           $self->{connection_time},
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ /^server::sql/) {
-      $self->add_nagios(
-          # the first item in the list will trigger the threshold values
-          $self->check_thresholds($self->{genericsql}[0], 1, 5),
-              sprintf "%s: %s%s",
-              $params{name2} ? lc $params{name2} : lc $params{selectname},
+      if ($params{name2} && $params{name2} ne $params{name}) {
+        if ($params{regexp}) {
+          if ($self->{genericsql} =~ /$params{name2}/) {
+            $self->add_nagios_ok(
+                sprintf "output %s matches pattern %s",
+                    $self->{genericsql}, $params{name2});
+          } else {
+            $self->add_nagios_critical(
+                sprintf "output %s does not match pattern %s",
+                    $self->{genericsql}, $params{name2});
+          }
+        } else {
+          if ($self->{genericsql} eq /$params{name2}/) {
+            $self->add_nagios_ok(
+                sprintf "output %s found", $self->{genericsql});
+          } else {
+            $self->add_nagios_critical(
+                sprintf "output %s not found", $self->{genericsql});
+          }
+        }
+      } else {
+        $self->add_nagios(
+            # the first item in the list will trigger the threshold values
+            $self->check_thresholds($self->{genericsql}[0], 1, 5),
+                sprintf "%s: %s%s",
+                $params{name2} ? lc $params{name2} : lc $params{selectname},
+                # float as float, integers as integers
+                join(" ", map {
+                    (sprintf("%d", $_) eq $_) ? $_ : sprintf("%f", $_)
+                } @{$self->{genericsql}}),
+                $params{units} ? $params{units} : "");
+        my $i = 0;
+        # workaround... getting the column names from the database would be nicer
+        my @names2_arr = split(/\s+/, $params{name2});
+        foreach my $t (@{$self->{genericsql}}) {
+          $self->add_perfdata(sprintf "\'%s\'=%s%s;%s;%s",
+              $names2_arr[$i] ? lc $names2_arr[$i] : lc $params{selectname},
               # float as float, integers as integers
-              join(" ", map {
-                  (sprintf("%d", $_) eq $_) ? $_ : sprintf("%f", $_)
-              } @{$self->{genericsql}}),
-              $params{units} ? $params{units} : "");
-      my $i = 0;
-      # workaround... getting the column names from the database would be nicer
-      my @names2_arr = split(/\s+/, $params{name2});
-      foreach my $t (@{$self->{genericsql}}) {
-        $self->add_perfdata(sprintf "\'%s\'=%s%s;%s;%s",
-            $names2_arr[$i] ? lc $names2_arr[$i] : lc $params{selectname},
-            # float as float, integers as integers
-            (sprintf("%d", $t) eq $t) ? $t : sprintf("%f", $t),
-            $params{units} ? $params{units} : "",
-	    ($i == 0) ? $self->{warningrange} : "",
-            ($i == 0) ? $self->{criticalrange} : ""
-        );
-        $i++;
+              (sprintf("%d", $t) eq $t) ? $t : sprintf("%f", $t),
+              $params{units} ? $params{units} : "",
+            ($i == 0) ? $self->{warningrange} : "",
+              ($i == 0) ? $self->{criticalrange} : ""
+          );
+          $i++;
+        }
       }
     } elsif ($params{mode} =~ /^my::([^:.]+)/) {
       $self->{my}->nagios(%params);
