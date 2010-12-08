@@ -329,6 +329,7 @@ my @params = (
     "ident",
     "3",
     "with-mymodules-dyn-dir=s",
+    "report=s",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -389,6 +390,12 @@ if (exists $commandline{method}) {
   # dbi, snmp or sqlplus
 } else {
   $commandline{method} = "dbi";
+}
+
+if (exists $commandline{report}) {
+  # short, long, html
+} else {
+  $commandline{method} = "long";
 }
 
 if (exists $commandline{'with-mymodules-dyn-dir'}) {
@@ -555,6 +562,7 @@ my %params = (
     statefilesdir => $STATEFILESDIR,
     ident => $commandline{ident},
     verbose => $commandline{verbose},
+    report => $commandline{report},
 );
 
 my $server = undef;
