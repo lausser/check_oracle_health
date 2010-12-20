@@ -46,6 +46,7 @@ sub new {
     criticalrange => $params{criticalrange},
     verbose => $params{verbose},
     ident => $params{ident},
+    report => $params{report},
     version => 'unknown',
     instance => undef,
     database => undef,
@@ -216,7 +217,7 @@ sub nagios {
                     $self->{genericsql}, $params{name2});
           }
         } else {
-          if ($self->{genericsql} eq /$params{name2}/) {
+          if ($self->{genericsql} eq $params{name2}) {
             $self->add_nagios_ok(
                 sprintf "output %s found", $self->{genericsql});
           } else {
@@ -375,98 +376,48 @@ sub merge_nagios {
 
 sub calculate_result {
   my $self = shift;
+  my $multiline = 0;
+  map {
+    $self->{nagios_level} = $ERRORS{$_} if 
+        (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}}));
+  } ("OK", "UNKNOWN", "WARNING", "CRITICAL");
+  if ($ENV{NRPE_MULTILINESUPPORT} && 
+      length join(" ", @{$self->{nagios}->{perfdata}}) > 200) {
+    $multiline = 1;
+  }
+  my $all_messages = join(($multiline ? "\n" : ", "), map {
+      join(($multiline ? "\n" : ", "), @{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } grep {
+      scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } ("CRITICAL", "WARNING", "UNKNOWN", "OK"));
+  my $bad_messages = join(($multiline ? "\n" : ", "), map {
+      join(($multiline ? "\n" : ", "), @{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } grep {
+      scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } ("CRITICAL", "WARNING", "UNKNOWN"));
+  my $all_messages_short = $bad_messages ? $bad_messages : 'no problems';
+  my $all_messages_html = "<table style=\"border-collapse: collapse;\">".
+      join("", map {
+          my $level = $ERRORS{$_};
+          join("", map {
+              sprintf "<tr valign=\"top\"><td class=\"service%s\">%s</td></tr>",
+              $level, $_;
+          } @{$self->{nagios}->{messages}->{$level}});
+      } grep {
+          scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+      } ("CRITICAL", "WARNING", "UNKNOWN", "OK")).
+  "</table>";
   if (exists $self->{identstring}) {
     $self->{nagios_message} .= $self->{identstring};
   }
   if ($self->{report} eq "long") {
-    if ($ENV{NRPE_MULTILINESUPPORT} && 
-        length join(" ", @{$self->{nagios}->{perfdata}}) > 200) {
-      foreach my $level ("CRITICAL", "WARNING", "UNKNOWN", "OK") {
-        # first the bad news
-        if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-          $self->{nagios_message} .=
-              "\n".join("\n", @{$self->{nagios}->{messages}->{$ERRORS{$level}}});
-        }
-      }
-      $self->{nagios_message} =~ s/^\n//g;
-      $self->{perfdata} = join("\n", @{$self->{nagios}->{perfdata}});
-    } else {
-      foreach my $level ("CRITICAL", "WARNING", "UNKNOWN", "OK") {
-        # first the bad news
-        if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-          $self->{nagios_message} .= 
-              join(", ", @{$self->{nagios}->{messages}->{$ERRORS{$level}}}).", ";
-        }
-      }
-      $self->{nagios_message} =~ s/, $//g;
-      $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
-    }
-  } elsif ($self->{report} eq "html") {
-    if ($ENV{NRPE_MULTILINESUPPORT} && 
-        length join(" ", @{$self->{nagios}->{perfdata}}) > 200) {
-      foreach my $level ("CRITICAL", "WARNING", "UNKNOWN", "OK") {
-        # first the bad news
-        if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-          $self->{nagios_message} .=
-              "\n".join("\n", @{$self->{nagios}->{messages}->{$ERRORS{$level}}});
-        }
-      }
-      $self->{nagios_message} =~ s/^\n//g;
-      $self->{perfdata} = join("\n", @{$self->{nagios}->{perfdata}});
-    } else {
-      foreach my $level ("CRITICAL", "WARNING", "UNKNOWN", "OK") {
-        # first the bad news
-        if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-          $self->{nagios_message} .= 
-              join(", ", @{$self->{nagios}->{messages}->{$ERRORS{$level}}}).", ";
-        }
-      }
-      $self->{nagios_message} =~ s/, $//g;
-      $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
-    }
+    $self->{nagios_message} .= $all_messages;
   } elsif ($self->{report} eq "short") {
-    # if ok : output a short message
-    # if nok: output the bad messages only
-    my $multiline = 0;
-    my $i_am_ok = 1;
-    foreach my $level ("CRITICAL", "WARNING", "UNKNOWN") {
-      if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-        $i_am_ok = 0;
-      }
-    }
-    if ($ENV{NRPE_MULTILINESUPPORT} && 
-        length join(" ", @{$self->{nagios}->{perfdata}}) > 200) {
-      $multiline = 1;
-    }
-    if (! $i_am_ok) {
-      foreach my $level ("CRITICAL", "WARNING", "UNKNOWN") {
-        # first the bad news
-        if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-          if ($multiline) {
-            $self->{nagios_message} .=
-                "\n".join("\n", @{$self->{nagios}->{messages}->{$ERRORS{$level}}});
-          } else {
-          $self->{nagios_message} .= 
-              join(", ", @{$self->{nagios}->{messages}->{$ERRORS{$level}}}).", ";
-          }
-        }
-      }
-    } else {
-      $self->{nagios_message} .= "no problems";
-    }
-    if ($multiline) {
-      $self->{nagios_message} =~ s/^\n//g;
-      $self->{perfdata} = join("\n", @{$self->{nagios}->{perfdata}});
-    } else {
-      $self->{nagios_message} =~ s/, $//g;
-      $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
-    }
+    $self->{nagios_message} .= $all_messages_short;
+  } elsif ($self->{report} eq "html") {
+    $self->{nagios_message} .= $all_messages_short."\n".$all_messages_html;
   }
-  foreach my $level ("OK", "UNKNOWN", "WARNING", "CRITICAL") {
-    if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$level}}})) {
-      $self->{nagios_level} = $ERRORS{$level};
-    }
-  }
+  $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
 }
 
 sub set_global_db_thresholds {

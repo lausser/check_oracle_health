@@ -395,7 +395,7 @@ if (exists $commandline{method}) {
 if (exists $commandline{report}) {
   # short, long, html
 } else {
-  $commandline{method} = "long";
+  $commandline{report} = "long";
 }
 
 if (exists $commandline{'with-mymodules-dyn-dir'}) {
