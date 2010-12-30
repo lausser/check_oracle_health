@@ -2,7 +2,10 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
-1.6.7 - 2011-12-18
+1.6.8 - 2010-12-30
+- massive speedup in modes seg-top10-* (Thanks Michael Nieberg http://kenntwas.de)
+
+1.6.7 - 2010-12-18
 - mode sql can now have a non-numerical output which is compared to a string/regexp
 - new mode report can be used to output only the bad news (short,long,html)
 

@@ -176,28 +176,59 @@ sub init {
       /server::database::tablespace::segment::top10bufferbusywaits/) ||
       ($params{mode} =~
       /server::database::tablespace::segment::top10rowlockwaits/)) {
+    my $sql;
     my $mode = (split(/::/, $params{mode}))[4];
     ##    -- SELECT owner, object_name, object_type, value, statistic_name
-    my $sql = q{
-        SELECT COUNT(*)
-        FROM (select DO.owner, DO.object_name, DO.object_type, SS.value,
-            SS.statistic_name, row_number () over (order by value desc) RN
-            FROM dba_objects DO, v$segstat SS
-            WHERE DO.object_id = SS.obj#
-            AND statistic_name = ?)
-       WHERE RN <= 10
-       AND owner not in
-           ('CTXSYS', 'DBSNMP', 'MDDATA', 'MDSYS', 'DMSYS', 'OLAPSYS',
-           'ORDPLUGINS', 'ORDSYS', 'OUTLN', 'SI_INFORMTN_SCHEMA',
-           'SYS', 'SYSMAN', 'SYSTEM')
-    };
-    $sql = q{
-        select DO.owner, DO.object_name, DO.object_type, SS.value,
-            SS.statistic_name
-            FROM dba_objects DO, v$segstat SS
-            WHERE DO.object_id = SS.obj#
-            AND statistic_name = ?
-    };
+    if (DBD::Oracle::Server::return_first_server()->version_is_minimum("10.x")) {
+      # this uses oracle analytic function rank() over (),
+      #  needs oracle >= 10.x
+      # for more information see: 
+      # http://kenntwas.de/2010/linux/monitoring/check_oracle_health-seg-top10-abfragen-verbessern/
+      $sql = q{
+          SELECT DO.owner,
+                 DO.object_name,
+                 DO.object_type,
+                 SS.VALUE,
+                 SS.statistic_name
+            FROM dba_objects DO,
+                 (SELECT *
+                    FROM (SELECT S.OBJ#,
+                                 s.VALUE,
+                                 s.statistic_name,
+                                 RANK () OVER (ORDER BY s.VALUE DESC) rk
+                            FROM v$segstat s
+                           WHERE s.statistic_name = ?
+                                 /* reduce data to significant values */
+                                 AND VALUE <> 0)
+                   WHERE rk <= 10   /* top 10 */
+                                              ) SS
+           WHERE DO.object_id = SS.obj#
+      };
+    } else {
+      my $sql = q{
+          SELECT COUNT(*)
+          FROM (select DO.owner, DO.object_name, DO.object_type, SS.value,
+              SS.statistic_name, row_number () over (order by value desc) RN
+              FROM dba_objects DO, v$segstat SS
+              WHERE DO.object_id = SS.obj#
+              AND statistic_name = ?)
+         WHERE RN <= 10
+         AND owner not in
+             ('CTXSYS', 'DBSNMP', 'MDDATA', 'MDSYS', 'DMSYS', 'OLAPSYS',
+             'ORDPLUGINS', 'ORDSYS', 'OUTLN', 'SI_INFORMTN_SCHEMA',
+             'SYS', 'SYSMAN', 'SYSTEM')
+      };
+      # this is a very heavy operation and de-selecting system users
+      # makes it even slower, so we fetch all data and do the filtering
+      # later in perl.
+      $sql = q{
+          select DO.owner, DO.object_name, DO.object_type, SS.value,
+              SS.statistic_name
+              FROM dba_objects DO, v$segstat SS
+              WHERE DO.object_id = SS.obj#
+              AND statistic_name = ?
+      };
+    }
     my $statname = {
       top10logicalreads => "logical reads",
       top10physicalreads => "physical reads",
