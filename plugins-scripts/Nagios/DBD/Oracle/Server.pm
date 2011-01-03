@@ -126,8 +126,7 @@ sub init {
       @{$self->{genericsql}} =
           $self->{handle}->fetchrow_array($params{selectname});
       if (! (defined $self->{genericsql} &&
-          (scalar(grep { /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/ } @{$self->{genericsql
-}})) ==
+          (scalar(grep { /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/ } @{$self->{genericsql}})) ==
           scalar(@{$self->{genericsql}}))) {
         $self->add_nagios_unknown(sprintf "got no valid response for %s",   
             $params{selectname});
