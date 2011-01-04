@@ -1392,11 +1392,11 @@ sub fetchrow_array {
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
-    my $output = do { local (@ARGV, $/) = $self->{sql_outfile}; <> };
+    my $output = do { local (@ARGV, $/) = $self->{sql_outfile}; <> } || 'empty';
     my @oerrs = map {
       /(ORA\-\d+:.*)/ ? $1 : ();
     } split(/\n/, $output);
-    $self->{errstr} = join(" ", @oerrs);
+    $self->{errstr} = join(" ", @oerrs).' '.$exit_output;
   } else {
     my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
     @row = map { convert($_) } 
@@ -1439,11 +1439,11 @@ sub fetchall_array {
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
     printf STDERR "fetchrow_array exit bumm %s\n", $exit_output;
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
+    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> } || 'empty';
     my @oerrs = map {
       /(ORA\-\d+:.*)/ ? $1 : ();
     } split(/\n/, $output);
-    $self->{errstr} = join(" ", @oerrs);
+    $self->{errstr} = join(" ", @oerrs).' '.$exit_output;
   } else {
     my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
     my @rows = map { [ 
