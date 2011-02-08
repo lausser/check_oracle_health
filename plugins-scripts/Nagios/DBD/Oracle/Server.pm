@@ -1113,7 +1113,7 @@ sub init {
       if (/\.(sql|out|err)$/) {
         if (($now - (stat $_)[9]) > 300) {
           printf "delete leftover %s\n", $_;
-          #unlink $_;
+          unlink $_;
         }
       }
     }
