@@ -1101,8 +1101,22 @@ sub init {
   my $retval = undef;
   $self->{loginstring} = "traditional";
   my $template = $self->{mode}.'XXXXX';
+  my $now = time;
   if ($^O =~ /MSWin/) {
     $template =~ s/::/_/g;
+    # After sqlplus has ended, the perl process somehow inherits the 
+    # open filehandle of the spool file, so it cannot be deleted.
+    # This results in thousands of leftover files, which we clean up here.
+    my $pattern = $template;
+    $pattern =~ s/XXXXX$//g;
+    foreach (glob $self->system_tmpdir().'/'.$pattern.'*') {
+      if (/\.(sql|out|err)$/) {
+        if (($now - (stat $_)[9]) > 300) {
+          printf "delete leftover %s\n", $_;
+          #unlink $_;
+        }
+      }
+    }
   }
   ($self->{sql_commandfile_handle}, $self->{sql_commandfile}) =
       tempfile($template, SUFFIX => ".sql", 

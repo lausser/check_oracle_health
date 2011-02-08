@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.6.8.1 - 2011-01-08
+- Workaround for the windows version which cleans up leftover spool files which cannot be deleted.
+
 1.6.8 - 2010-01.03
 - massive speedup in modes seg-top10-* (Thanks Michael Nieberg http://kenntwas.de)
 - bugfix in --mode sql (numeric vs. regexp result) (Thanks Michel Meelker)
