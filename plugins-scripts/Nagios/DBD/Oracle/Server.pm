@@ -1112,7 +1112,6 @@ sub init {
     foreach (glob $self->system_tmpdir().'/'.$pattern.'*') {
       if (/\.(sql|out|err)$/) {
         if (($now - (stat $_)[9]) > 300) {
-          printf "delete leftover %s\n", $_;
           unlink $_;
         }
       }
