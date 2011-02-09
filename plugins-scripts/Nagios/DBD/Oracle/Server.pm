@@ -949,7 +949,7 @@ sub tnsping {
   my $re_tns_gentry = '^\w.*?=';                    # generic entry
   my $re_tns_pair   = '\w+\s*\=\s*[\w\.]+';         # used to parse key=val
   my $re_keys       = 'host|port|sid';
-  my @tnsfile = split(/\n/, do { local (@ARGV, $/) = $self->{tnsfile}; <> });
+  my @tnsfile = split(/\n/, do { local (@ARGV, $/) = $self->{tnsfile}; my $x = <>; close ARGV; $x; });
   my $found = 0;
   my $datastring = "";
   foreach (@tnsfile) {
@@ -1104,9 +1104,8 @@ sub init {
   my $now = time;
   if ($^O =~ /MSWin/) {
     $template =~ s/::/_/g;
-    # After sqlplus has ended, the perl process somehow inherits the 
-    # open filehandle of the spool file, so it cannot be deleted.
-    # This results in thousands of leftover files, which we clean up here.
+    # This is no longer necessary. (Explanation in fetchrow_array "best practice".
+    # But maybe we have crap files for whatever reason.
     my $pattern = $template;
     $pattern =~ s/XXXXX$//g;
     foreach (glob $self->system_tmpdir().'/'.$pattern.'*') {
@@ -1117,18 +1116,13 @@ sub init {
       }
     }
   }
-  ($self->{sql_commandfile_handle}, $self->{sql_commandfile}) =
-      tempfile($template, SUFFIX => ".sql", 
+  my ($tempfile_handle, $tempfile) =
+      tempfile($template, SUFFIX => ".temp", UNLINK => 1,
       DIR => $self->system_tmpdir() );
-  close $self->{sql_commandfile_handle};
-  ($self->{sql_resultfile_handle}, $self->{sql_resultfile}) =
-      tempfile($template, SUFFIX => ".out", 
-      DIR => $self->system_tmpdir() );
-  close $self->{sql_resultfile_handle};
-  ($self->{sql_outfile_handle}, $self->{sql_outfile}) =
-      tempfile($template, SUFFIX => ".out", 
-      DIR => $self->system_tmpdir() );
-  close $self->{sql_outfile_handle};
+  close $tempfile_handle;
+  ($self->{sql_commandfile} = $tempfile) =~ s/temp$/sql/;
+  ($self->{sql_resultfile} = $tempfile) =~ s/temp$/out/;
+  ($self->{sql_outfile} = $tempfile) =~ s/temp$/err/;
   if ($self->{mode} =~ /^server::tnsping/) {
     if (! $self->{connect}) {
       $self->{errstr} = "Please specify a database";
@@ -1405,13 +1399,15 @@ sub fetchrow_array {
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
-    my $output = do { local (@ARGV, $/) = $self->{sql_outfile}; <> } || 'empty';
+    my $output = do { local (@ARGV, $/) = $self->{sql_outfile}; my $x = <>; close ARGV; $x } || 'empty';
     my @oerrs = map {
       /(ORA\-\d+:.*)/ ? $1 : ();
     } split(/\n/, $output);
     $self->{errstr} = join(" ", @oerrs).' '.$exit_output;
   } else {
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
+    # This so-called "best practice" leaves an open filehandle under windows
+    # my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
+    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
     @row = map { convert($_) } 
         map { s/^\s+([\.\d]+)$/$1/g; $_ }         # strip leading space from numbers
         map { s/\s+$//g; $_ }                     # strip trailing space
@@ -1452,13 +1448,13 @@ sub fetchall_array {
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
     printf STDERR "fetchrow_array exit bumm %s\n", $exit_output;
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> } || 'empty';
+    my $output = do { local (@ARGV, $/) = $self->{sql_outfile}; my $x = <>; close ARGV; $x } || 'empty';
     my @oerrs = map {
       /(ORA\-\d+:.*)/ ? $1 : ();
     } split(/\n/, $output);
     $self->{errstr} = join(" ", @oerrs).' '.$exit_output;
   } else {
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
+    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
     my @rows = map { [ 
         map { convert($_) } 
         map { s/^\s+([\.\d]+)$/$1/g; $_ }
