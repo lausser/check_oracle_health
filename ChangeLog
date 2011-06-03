@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.6.8.2 - 2011-06-03
+- sites in an OMD (http://omdistro.org) environment have now private statefile directories
+
 1.6.8.1 - 2011-01-08
 - Workaround for the windows version which cleans up leftover spool files which cannot be deleted.
 

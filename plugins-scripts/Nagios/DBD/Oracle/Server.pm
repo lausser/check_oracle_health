@@ -537,6 +537,9 @@ sub dbconnect {
       $self->add_nagios($ERRORS{CRITICAL},
           sprintf "connection could not be established within %d seconds",
               $self->{timeout});
+    } elsif ($self->{handle}->{errstr} =~ /specify/) {
+      $self->add_nagios($ERRORS{CRITICAL}, $self->{handle}->{errstr});
+      $retval = undef;
     } else {
       if ($self->{connect} =~ /^(.*?)\/(.*)@(.*)$/) {
         $self->{connect} = sprintf "%s/***@%s", $1, $3;
@@ -610,7 +613,18 @@ sub save_state {
     $mode =~ s/::/_/g;
     $params{statefilesdir} = $self->system_vartmpdir();
   }
-  mkdir $params{statefilesdir} unless -d $params{statefilesdir};
+  if (! -d $params{statefilesdir}) {
+    eval {
+      use File::Path;
+      mkpath $params{statefilesdir};
+    };
+  }
+  if ($@ || ! -w $params{statefilesdir}) {
+    $self->add_nagios($ERRORS{CRITICAL},
+        sprintf "statefilesdir %s does not exist or is not writable\n", 
+        $params{statefilesdir});
+    return;
+  }
   my $statefile = sprintf "%s/%s_%s", 
       $params{statefilesdir}, $params{connect}, $mode;
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";

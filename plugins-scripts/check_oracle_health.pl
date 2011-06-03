@@ -328,6 +328,7 @@ my @params = (
     "units=s",
     "ident",
     "3",
+    "statefilesdir=s",
     "with-mymodules-dyn-dir=s",
     "report=s",
     "extra-opts:s");
@@ -482,6 +483,16 @@ if (exists $commandline{shell}) {
   system("/bin/sh");
 }
 
+if (! exists $commandline{statefilesdir}) {
+  if (exists $ENV{OMD_ROOT}) {
+    $commandline{statefilesdir} = $ENV{OMD_ROOT}."/var/tmp/check_oracle_health";
+  } else {
+    $commandline{statefilesdir} = $STATEFILESDIR;
+  }
+} else {
+  $commandline{statefilesdir} = $STATEFILESDIR;
+}
+
 if (exists $commandline{name}) {
   # objects can be encoded like an url
   # with s/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg;
@@ -559,7 +570,7 @@ my %params = (
     name2 => $commandline{name2} || $commandline{name},
     units => $commandline{units},
     eyecandy => $commandline{eyecandy},
-    statefilesdir => $STATEFILESDIR,
+    statefilesdir => $commandline{statefilesdir},
     ident => $commandline{ident},
     verbose => $commandline{verbose},
     report => $commandline{report},
