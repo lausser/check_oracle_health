@@ -60,6 +60,23 @@ sub init {
     $self->{connected_users} = $self->{handle}->fetchrow_array(q{
         SELECT COUNT(*) FROM v$session WHERE type = 'USER' 
     });
+  } elsif ($params{mode} =~ /server::instance::rman::backup::problems/) {
+    $self->{rman_backup_problems} = $self->{handle}->fetchrow_array(q{
+        SELECT COUNT(*) FROM v$rman_status WHERE status != 'COMPLETED'
+        AND          
+        status != 'RUNNING' 
+        AND start_time > sysdate-3
+    });
+  } elsif ($params{mode} =~ /server::instance::sessionusage/) {
+    $self->{session_usage} = $self->{handle}->fetchrow_array(q{
+        SELECT current_utilization/limit_value*100 
+        FROM v$resource_limit WHERE resource_name LIKE '%sessions%'
+    });
+  } elsif ($params{mode} =~ /server::instance::processusage/) {
+    $self->{process_usage} = $self->{handle}->fetchrow_array(q{
+        SELECT current_utilization/limit_value*100 
+        FROM v$resource_limit WHERE resource_name LIKE '%processes%'
+    });
   }
 }
 
@@ -118,6 +135,30 @@ sub nagios {
               $self->{connected_users});
       $self->add_perfdata(sprintf "connected_users=%d;%d;%d",
           $self->{connected_users},
+          $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::rman::backup::problems/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{rman_backup_problems}, 1, 2),
+          sprintf "rman had %d problems during the last 3 days",
+              $self->{rman_backup_problems});
+      $self->add_perfdata(sprintf "rman_backup_problems=%d;%d;%d",
+          $self->{rman_backup_problems},
+          $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::sessionusage/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{session_usage}, 80, 100),
+          sprintf "%.2f%% of session resources used",
+              $self->{session_usage});
+      $self->add_perfdata(sprintf "session_usage=%.2f%%;%d;%d",
+          $self->{session_usage},
+          $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::processusage/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{process_usage}, 80, 100),
+          sprintf "%.2f%% of process resources used",
+              $self->{process_usage});
+      $self->add_perfdata(sprintf "process_usage=%.2f%%;%d;%d",
+          $self->{process_usage},
           $self->{warningrange}, $self->{criticalrange});
   }
 }

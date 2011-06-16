@@ -21,7 +21,10 @@ sub new {
         invalid_registry_components => undef,
     },
     staleobjects => undef,
+    corruptedblocks => undef,
     tablespaces => [],
+    num_datafiles => undef,
+    num_datafiles_max => undef,
   };
   bless $self, $class;
   $self->init(%params);
@@ -52,6 +55,19 @@ sub init {
     $self->init_invalid_objects(%params);
   } elsif ($params{mode} =~ /server::database::stalestats/) {
     $self->init_stale_objects(%params);
+  } elsif ($params{mode} =~ /server::database::blockcorruption/) {
+    $self->init_corrupted_blocks(%params);
+  } elsif ($params{mode} =~ /server::database::datafilescreated/) {
+    $self->{num_datafiles_max} = $self->{handle}->fetchrow_array(q{
+        SELECT value FROM v$system_parameter WHERE name  = 'db_files'
+    });
+    $self->{num_datafiles} = $self->{handle}->fetchrow_array(q{
+        SELECT COUNT(*) FROM sys.dba_data_files
+    });
+    if (! defined $self->{num_datafiles_max} ||
+      ! defined $self->{num_datafiles}) {
+      $self->add_nagios_critical("unable to get number of datafiles");
+    }
   }
 }
 
@@ -132,6 +148,18 @@ sub init_stale_objects {
   }
 }
 
+sub init_corrupted_blocks {
+  my $self = shift;
+  my %params = @_;
+  $self->{corruptedblocks} = $self->{handle}->fetchrow_array(q{
+      SELECT COUNT(*) FROM v$database_block_corruption
+  });
+  if (! defined $self->{corruptedblocks}) {
+    $self->add_nagios_critical("unable to get corrupted blocks");
+    return undef;
+  }
+}
+
 sub nagios {
   my $self = shift;
   my %params = @_;
@@ -192,6 +220,26 @@ sub nagios {
       $self->add_perfdata(sprintf "stale_stats_objects=%d;%s;%s",
           $self->{staleobjects},
           $self->{warningrange}, $self->{criticalrange});
+    } elsif ($params{mode} =~ /server::database::blockcorruption/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{corruptedblocks}, "1", "10"),
+          sprintf "%d database blocks are corrupted", $self->{corruptedblocks});
+      $self->add_perfdata(sprintf "corrupted_blocks=%d;%s;%s",
+          $self->{corruptedblocks},
+          $self->{warningrange}, $self->{criticalrange});
+    } elsif ($params{mode} =~ /server::database::datafilescreated/) {
+        my $datafile_usage = $self->{num_datafiles_max} / 
+            $self->{num_datafiles} * 100;
+      $self->add_nagios(
+          $self->check_thresholds($datafile_usage, "80", "90"),
+          sprintf "%.2f%% of max datafiles created (%d of %d max)",
+              $datafile_usage, $self->{num_datafiles}, $self->{num_datafiles_max});
+      $self->add_perfdata(sprintf "datafiles_created_pct=%.2f;%s;%s",
+          $datafile_usage,
+          $self->{warningrange}, $self->{criticalrange});
+      $self->add_perfdata(sprintf "datafiles_created=%d;%s;%s;0;%d",
+          $self->{num_datafiles},
+          $self->{warningrange}, $self->{criticalrange}, $self->{num_datafiles_max});
     }
   }
 }

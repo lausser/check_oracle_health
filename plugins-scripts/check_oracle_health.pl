@@ -66,6 +66,9 @@ my @modes = (
   ['server::database::stalestats',
       'stale-statistics', undef,
       'Find objects with stale optimizer statistics' ],
+  ['server::database::datafilescreated',
+      'datafiles-created', undef,
+      'Percentage of the maximum number of datafiles' ],
   ['server::database::tablespace::usage',
       'tablespace-usage', undef,
       'Used space in tablespaces' ],
@@ -489,8 +492,6 @@ if (! exists $commandline{statefilesdir}) {
   } else {
     $commandline{statefilesdir} = $STATEFILESDIR;
   }
-} else {
-  $commandline{statefilesdir} = $STATEFILESDIR;
 }
 
 if (exists $commandline{name}) {
