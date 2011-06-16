@@ -228,8 +228,8 @@ sub nagios {
           $self->{corruptedblocks},
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ /server::database::datafilescreated/) {
-        my $datafile_usage = $self->{num_datafiles_max} / 
-            $self->{num_datafiles} * 100;
+        my $datafile_usage = $self->{num_datafiles} / 
+            $self->{num_datafiles_max} * 100;
       $self->add_nagios(
           $self->check_thresholds($datafile_usage, "80", "90"),
           sprintf "%.2f%% of max datafiles created (%d of %d max)",
