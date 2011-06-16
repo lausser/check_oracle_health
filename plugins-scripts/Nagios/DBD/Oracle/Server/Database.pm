@@ -239,7 +239,9 @@ sub nagios {
           $self->{warningrange}, $self->{criticalrange});
       $self->add_perfdata(sprintf "datafiles_num=%d;%s;%s;0;%d",
           $self->{num_datafiles},
-          $self->{warningrange}, $self->{criticalrange}, $self->{num_datafiles_max});
+          $self->{num_datafiles_max} / 100 * $self->{warningrange},
+          $self->{num_datafiles_max} / 100 * $self->{criticalrange},
+          $self->{num_datafiles_max});
     }
   }
 }
