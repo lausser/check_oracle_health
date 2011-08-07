@@ -2,6 +2,12 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.0 - 2011-08-07
+- add error handling for unwritable status files
+- fix a bug with statefilesdir and capital letters
+- enhance stale statistics
+- enhance invalid objects (Thanks Yannick Charton)
+
 1.6.9 - 2011-06-16
 - sites in an OMD (http://omdistro.org) environment have now private statefile directories
 - add mode session-usage, process-usage, rman-backup-problems, corrupted-blocks (Thanks Ovidiu Marcu)
