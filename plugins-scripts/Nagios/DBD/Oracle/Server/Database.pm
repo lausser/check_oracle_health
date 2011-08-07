@@ -87,21 +87,21 @@ sub init_invalid_objects {
   # should be only N/A or VALID
   $self->{invalidobjects}->{invalid_indexes} =
       $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(DISTINCT STATUS) 
+          SELECT COUNT(*) 
           FROM dba_indexes 
           WHERE status <> 'VALID' AND status <> 'N/A'
       });
   # should be only USABLE
   $self->{invalidobjects}->{invalid_ind_partitions} =
       $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(DISTINCT STATUS) 
+          SELECT COUNT(*) 
           FROM dba_ind_partitions 
           WHERE status <> 'USABLE'
       });
   # should be only VALID
   $self->{invalidobjects}->{invalid_registry_components} =
       $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(DISTINCT STATUS) 
+          SELECT COUNT(*) 
           FROM dba_registry
           WHERE status <> 'VALID'
       });
