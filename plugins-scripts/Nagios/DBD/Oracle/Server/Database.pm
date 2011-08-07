@@ -120,6 +120,7 @@ sub init_stale_objects {
   if ($self->version_is_minimum("10.x")) {
     $self->{staleobjects} = $self->{handle}->fetchrow_array(q{
         SELECT COUNT(*) FROM sys.dba_tab_statistics WHERE stale_stats = 'YES'
+            AND owner NOT IN ('SYS','SYSTEM','EXFSYS','DBSNMP','CTXSYS','DMSYS','MDDATA','MDSYS','OLAPSYS','ORDSYS','TSMSYS','WMSYS')
     });
   } else {
     # oracle9 + sqlplus nix gut
