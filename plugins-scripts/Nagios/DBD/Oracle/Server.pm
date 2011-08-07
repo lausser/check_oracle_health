@@ -621,12 +621,11 @@ sub save_state {
   }
   if ($@ || ! -w $params{statefilesdir}) {
     $self->add_nagios($ERRORS{CRITICAL},
-        sprintf "statefilesdir %s does not exist or is not writable\n", 
+        sprintf "statefilesdir %s does not exist or is not writable", 
         $params{statefilesdir});
     return;
   }
-  my $statefile = sprintf "%s/%s_%s", 
-      $params{statefilesdir}, $params{connect}, $mode;
+  my $statefile = sprintf "%s_%s", $params{connect}, $mode;
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";
   $extension .= $params{tablespace} ? "_".$params{tablespace} : "";
   $extension .= $params{datafile} ? "_".$params{datafile} : "";
@@ -638,12 +637,17 @@ sub save_state {
   $extension =~ s/\s/_/g;
   $statefile .= $extension;
   $statefile = lc $statefile;
-  open(STATE, ">$statefile");
-  if ((ref($params{save}) eq "HASH") && exists $params{save}->{timestamp}) {
-    $params{save}->{localtime} = scalar localtime $params{save}->{timestamp};
+  $statefile = sprintf "%s/%s", $params{statefilesdir}, $statefile;
+  if (open(STATE, ">$statefile")) {
+    if ((ref($params{save}) eq "HASH") && exists $params{save}->{timestamp}) {
+      $params{save}->{localtime} = scalar localtime $params{save}->{timestamp};
+    }
+    printf STATE Data::Dumper::Dumper($params{save});
+    close STATE;
+  } else {
+    $self->add_nagios($ERRORS{CRITICAL},
+        sprintf "statefile %s is not writable", $statefile);
   }
-  printf STATE Data::Dumper::Dumper($params{save});
-  close STATE;
   $self->debug(sprintf "saved %s to %s",
       Data::Dumper::Dumper($params{save}), $statefile);
 }
@@ -662,8 +666,7 @@ sub load_state {
     $mode =~ s/::/_/g;
     $params{statefilesdir} = $self->system_vartmpdir();
   }
-  my $statefile = sprintf "%s/%s_%s", 
-      $params{statefilesdir}, $params{connect}, $mode;
+  my $statefile = sprintf "%s_%s", $params{connect}, $mode;
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";
   $extension .= $params{tablespace} ? "_".$params{tablespace} : "";
   $extension .= $params{datafile} ? "_".$params{datafile} : "";
@@ -675,13 +678,15 @@ sub load_state {
   $extension =~ s/\s/_/g;
   $statefile .= $extension;
   $statefile = lc $statefile;
+  $statefile = sprintf "%s/%s", $params{statefilesdir}, $statefile;
   if ( -f $statefile) {
     our $VAR1;
     eval {
       require $statefile;
     };
     if($@) {
-printf "rumms\n";
+      $self->add_nagios($ERRORS{CRITICAL},
+          sprintf "statefile %s is corrupt", $statefile);
     }
     $self->debug(sprintf "load %s", Data::Dumper::Dumper($VAR1));
     return $VAR1;
@@ -1130,13 +1135,19 @@ sub init {
       }
     }
   }
-  my ($tempfile_handle, $tempfile) =
-      tempfile($template, SUFFIX => ".temp", UNLINK => 1,
-      DIR => $self->system_tmpdir() );
-  close $tempfile_handle;
-  ($self->{sql_commandfile} = $tempfile) =~ s/temp$/sql/;
-  ($self->{sql_resultfile} = $tempfile) =~ s/temp$/out/;
-  ($self->{sql_outfile} = $tempfile) =~ s/temp$/err/;
+  eval {
+    my ($tempfile_handle, $tempfile) =
+        tempfile($template, SUFFIX => ".temp", UNLINK => 1,
+        DIR => $self->system_tmpdir() );
+    close $tempfile_handle;
+    ($self->{sql_commandfile} = $tempfile) =~ s/temp$/sql/;
+    ($self->{sql_resultfile} = $tempfile) =~ s/temp$/out/;
+    ($self->{sql_outfile} = $tempfile) =~ s/temp$/err/;
+  };
+  if ($@) {
+    $self->{errstr} = sprintf "cannot create a temporary file in %s",
+        $self->system_tmpdir();
+  }
   if ($self->{mode} =~ /^server::tnsping/) {
     if (! $self->{connect}) {
       $self->{errstr} = "Please specify a database";
@@ -1536,15 +1547,17 @@ sub execute {
 sub DESTROY {
   my $self = shift;
   $self->trace("try to clean up command and result files");
-  unlink $self->{sql_commandfile} if -f $self->{sql_commandfile};
-  unlink $self->{sql_resultfile} if -f $self->{sql_resultfile};
-  unlink $self->{sql_outfile} if -f $self->{sql_outfile};
+  unlink $self->{sql_commandfile}
+      if $self->{sql_commandfile} && -f $self->{sql_commandfile};
+  unlink $self->{sql_resultfile}
+      if $self->{sql_resultfile} && -f $self->{sql_resultfile};
+  unlink $self->{sql_outfile} if
+      $self->{sql_outfile} && -f $self->{sql_outfile};
 }
 
 sub create_commandfile {
   my $self = shift;
   my $sql = shift;
-  open CMDCMD, "> $self->{sql_commandfile}"; 
   printf CMDCMD "SET HEADING OFF\n";
   printf CMDCMD "SET PAGESIZE 0\n";
   printf CMDCMD "SET LINESIZE 32767\n";
@@ -1554,7 +1567,7 @@ sub create_commandfile {
   printf CMDCMD "SET TRIMSPOOL ON\n";
   printf CMDCMD "SET NUMFORMAT 9.999999EEEE\n";
   printf CMDCMD "SPOOL %s\n", $self->{sql_resultfile};
-#  printf CMDCMD "ALTER SESSION SET NLS_NUMERIC_CHARACTERS='.,';\n/\n";
+  #  printf CMDCMD "ALTER SESSION SET NLS_NUMERIC_CHARACTERS='.,';\n/\n";
   printf CMDCMD "%s\n/\n", $sql;
   printf CMDCMD "SPOOL OFF\n", $sql;
   printf CMDCMD "EXIT\n";
