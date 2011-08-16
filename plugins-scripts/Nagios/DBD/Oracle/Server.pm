@@ -1559,6 +1559,7 @@ sub DESTROY {
 sub create_commandfile {
   my $self = shift;
   my $sql = shift;
+  open CMDCMD, "> $self->{sql_commandfile}";
   printf CMDCMD "SET HEADING OFF\n";
   printf CMDCMD "SET PAGESIZE 0\n";
   printf CMDCMD "SET LINESIZE 32767\n";
