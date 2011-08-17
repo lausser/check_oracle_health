@@ -47,6 +47,7 @@ sub new {
     verbose => $params{verbose},
     ident => $params{ident},
     report => $params{report},
+    commit => $params{commit},
     version => 'unknown',
     instance => undef,
     database => undef,
@@ -838,6 +839,7 @@ sub new {
     username => $params{username},
     password => $params{password},
     verbose => $params{verbose},
+    commit => $params{commit},
     tnsadmin => $ENV{TNS_ADMIN},
     oraclehome => $ENV{ORACLE_HOME},
     handle => undef,
@@ -921,9 +923,9 @@ sub init {
       sigaction(SIGALRM ,$action ,$oldaction );
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
-      my $connecthash = { RaiseError => 0, AutoCommit => 0, PrintError => 0 };
+      my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
       if ($self->{username} eq "sys" || $self->{username} eq "sysdba") {
-        $connecthash = { RaiseError => 0, AutoCommit => 0, PrintError => 0,
+        $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
               #ora_session_mode => DBD::Oracle::ORA_SYSDBA   
               ora_session_mode => 0x0002  };
         $dsn = sprintf "DBI:Oracle:";
@@ -1652,7 +1654,7 @@ sub init {
           sprintf("DBI:SQLRelay:host=%s;port=%d;socket=%s", $self->{host}, $self->{port}, $self->{socket}),
           $self->{username},
           $self->{password},
-          { RaiseError => 1, AutoCommit => 0, PrintError => 1 })) {
+          { RaiseError => 1, AutoCommit => $self->{commit}, PrintError => 1 })) {
         $self->{handle}->do(q{
             ALTER SESSION SET NLS_NUMERIC_CHARACTERS=".," });
         $retval = $self;

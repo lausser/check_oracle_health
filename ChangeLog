@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.1 - 2001-08-17
+- add option --commit (Thanks Ovidiu)
+
 1.7.0 - 2011-08-16
 - add error handling for unwritable status files
 - fix a bug with statefilesdir and capital letters

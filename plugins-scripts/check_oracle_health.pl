@@ -244,6 +244,8 @@ EOUS
        and for specifying thresholds for mode=tablespace-free
     --ident
        outputs instance and database names
+    --commit
+       turns on autocommit for the dbd::oracle module
 
   Tablespace-related modes check all tablespaces in one run by default.
   If only a single tablespace should be checked, use the --name parameter.
@@ -346,6 +348,7 @@ my @params = (
     "statefilesdir=s",
     "with-mymodules-dyn-dir=s",
     "report=s",
+    "commit",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -412,6 +415,12 @@ if (exists $commandline{report}) {
   # short, long, html
 } else {
   $commandline{report} = "long";
+}
+
+if (exists $commandline{commit}) {
+  $commandline{commit} = 1;
+} else {
+  $commandline{commit} = 0;
 }
 
 if (exists $commandline{'with-mymodules-dyn-dir'}) {
@@ -587,6 +596,7 @@ my %params = (
     ident => $commandline{ident},
     verbose => $commandline{verbose},
     report => $commandline{report},
+    commit => $commandline{commit},
 );
 
 my $server = undef;
