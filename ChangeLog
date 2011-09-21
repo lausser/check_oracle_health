@@ -2,6 +2,11 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.2 - 2011-09-21
+- add mode sga-library-cache-pinhit-ratio
+- sga-library-cache-hit-ratio becomes sga-library-cache-gethit-ratio
+- add mode sga-library-cache-reloads
+
 1.7.1 - 2001-08-17
 - add option --commit (Thanks Ovidiu)
 
