@@ -119,7 +119,8 @@ sub init {
             $self->{handle}->fetchrow_array($params{selectname});
         if (! defined $self->{genericsql}) {
           $self->add_nagios_unknown(sprintf "got no valid response for %s",
-              $params{selectname});
+              $params{selectname}.($self->{handle}->{errstr} ?
+              " - ".$self->{handle}->{errstr} : ""));
         }
       }
     } else {
@@ -130,7 +131,8 @@ sub init {
           (scalar(grep { /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/ } @{$self->{genericsql}})) ==
           scalar(@{$self->{genericsql}}))) {
         $self->add_nagios_unknown(sprintf "got no valid response for %s",   
-            $params{selectname});
+            $params{selectname}.($self->{handle}->{errstr} ?
+            " - ".$self->{handle}->{errstr} : ""));
       } else {
         # name2 in array
         # units in array
@@ -1436,10 +1438,27 @@ sub fetchrow_array {
     # This so-called "best practice" leaves an open filehandle under windows
     # my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
     my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
-    @row = map { convert($_) } 
-        map { s/^\s+([\.\d]+)$/$1/g; $_ }         # strip leading space from numbers
-        map { s/\s+$//g; $_ }                     # strip trailing space
-        split(/\|/, (split(/\n/, $output))[0]);
+    #
+    # SELECT count(*) FROM blah
+    #                 *
+    # ERROR at line 1:
+    # ORA-00942: table or view does not exist
+    # --> if there is a single * AND ERROR AND ORA then we surely have en error
+    if ($output =~ /^\s+\*[ \*]*$/m && 
+        $output =~ /^ERROR/m &&
+        $output =~/^ORA\-/m) {
+      my @oerrs = map {
+        /(ORA\-\d+:.*)/ ? $1 : ();
+      } split(/\n/, $output);
+      $self->{errstr} = join(" ", @oerrs);
+    } else {
+      if ($output) {
+        @row = map { convert($_) }
+            map { s/^\s+([\.\d]+)$/$1/g; $_ }         # strip leading space from numbers
+            map { s/\s+$//g; $_ }                     # strip trailing space
+            split(/\|/, (split(/\n/, $output))[0]);
+      }
+    }
   }
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
@@ -1695,6 +1714,9 @@ sub fetchrow_array {
   };
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
+    $self->debug(sprintf "bumm %s", $self->{handle}->errstr());
+    # this is useful for mode sql's output
+    $self->{errstr} = $self->{handle}->errstr();
   }
   $self->trace(sprintf "RESULT:\n%s\n",
       Data::Dumper::Dumper(\@row));
