@@ -1042,6 +1042,8 @@ sub fetchrow_array {
   }; 
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
+    $self->debug(sprintf "bumm %s", $self->{handle}->errstr());
+    $self->{errstr} = $self->{handle}->errstr();
   }
   $self->trace(sprintf "RESULT:\n%s\n",
       Data::Dumper::Dumper(\@row));
