@@ -96,7 +96,7 @@ sub init_invalid_objects {
       $self->{handle}->fetchrow_array(q{
           SELECT COUNT(*) 
           FROM dba_ind_partitions 
-          WHERE status <> 'USABLE'
+          WHERE status <> 'USABLE' AND status <> 'N/A'
       });
   # should be only VALID
   $self->{invalidobjects}->{invalid_registry_components} =

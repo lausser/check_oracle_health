@@ -916,14 +916,17 @@ sub init {
     eval {
       require DBI;
       use POSIX ':signal_h';
-      local $SIG{'ALRM'} = sub {
-        die "alarm\n";
-      };
-      my $mask = POSIX::SigSet->new( SIGALRM );
-      my $action = POSIX::SigAction->new(
-          sub { die "alarm\n" ; }, $mask);
-      my $oldaction = POSIX::SigAction->new();
-      sigaction(SIGALRM ,$action ,$oldaction );
+      if ($^O =~ /MSWin/) {
+        local $SIG{'ALRM'} = sub {
+          die "alarm\n";
+        };
+      } else {
+        my $mask = POSIX::SigSet->new( SIGALRM );
+        my $action = POSIX::SigAction->new(
+            sub { die "alarm\n" ; }, $mask);
+        my $oldaction = POSIX::SigAction->new();
+        sigaction(SIGALRM ,$action ,$oldaction );
+      }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
       my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
@@ -1356,10 +1359,11 @@ sub init {
       }
   
       use POSIX ':signal_h';
-      local $SIG{'ALRM'} = sub {
-        die "timeout\n";
-      };
-      if ($^O !~ /MSWin/) {
+      if ($^O =~ /MSWin/) {
+        local $SIG{'ALRM'} = sub {
+          die "alarm\n";
+        };
+      } else {
         my $mask = POSIX::SigSet->new( SIGALRM );
         my $action = POSIX::SigAction->new(
             sub { die "alarm\n" ; }, $mask);
@@ -1663,14 +1667,17 @@ sub init {
     eval {
       require DBI;
       use POSIX ':signal_h';
-      local $SIG{'ALRM'} = sub {
-        die "alarm\n";
-      };
-      my $mask = POSIX::SigSet->new( SIGALRM );
-      my $action = POSIX::SigAction->new(
-      sub { die "alarm\n" ; }, $mask);
-      my $oldaction = POSIX::SigAction->new();
-      sigaction(SIGALRM ,$action ,$oldaction );
+      if ($^O =~ /MSWin/) {
+        local $SIG{'ALRM'} = sub {
+          die "alarm\n";
+        };
+      } else {
+        my $mask = POSIX::SigSet->new( SIGALRM );
+        my $action = POSIX::SigAction->new(
+            sub { die "alarm\n" ; }, $mask);
+        my $oldaction = POSIX::SigAction->new();
+        sigaction(SIGALRM ,$action ,$oldaction );
+      }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       if ($self->{handle} = DBI->connect(
           sprintf("DBI:SQLRelay:host=%s;port=%d;socket=%s", $self->{host}, $self->{port}, $self->{socket}),
