@@ -70,7 +70,8 @@ sub init {
   } elsif ($params{mode} =~ /server::instance::sessionusage/) {
     $self->{session_usage} = $self->{handle}->fetchrow_array(q{
         SELECT current_utilization/limit_value*100 
-        FROM v$resource_limit WHERE resource_name LIKE '%sessions%'
+        FROM v$resource_limit WHERE resource_name = 'sessions'
+        -- FROM v$resource_limit WHERE resource_name LIKE '%sessions%'
     });
   } elsif ($params{mode} =~ /server::instance::processusage/) {
     $self->{process_usage} = $self->{handle}->fetchrow_array(q{
