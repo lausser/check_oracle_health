@@ -2,10 +2,11 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
-1.7.4
+1.7.4 - 2012-03-15
 - bugfix in timeout-alarm handling under windows (Thanks Marian Jamrich)
 - bugfix in invalid-objects. No longer counts subpartitions (Thanks Teijo Lallukka)
 - bugfix in session-usage (Thanks Bauchi)
+- add mode sql-runtime
 
 1.7.3 - 2011 09-29
 - mode sql now correctly handles dml sql errors like missing tables etc.
