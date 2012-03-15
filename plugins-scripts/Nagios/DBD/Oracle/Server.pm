@@ -110,10 +110,10 @@ sub init {
     $self->{database} = DBD::Oracle::Server::Database->new(%params);
   } elsif ($params{mode} =~ /^server::sqlruntime/) {
     $self->set_local_db_thresholds(%params);
-    my $tic = time;
+    my $tic = Time::HiRes::time();
       @{$self->{genericsql}} =
           $self->{handle}->fetchrow_array($params{selectname});
-    $self->{runtime} = time - $tic;
+    $self->{runtime} = Time::HiRes::time() - $tic;
   } elsif ($params{mode} =~ /^server::sql/) {
     $self->set_local_db_thresholds(%params);
     if ($params{regexp}) {
