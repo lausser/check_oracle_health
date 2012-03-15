@@ -108,6 +108,12 @@ sub init {
     $self->{instance} = DBD::Oracle::Server::Instance->new(%params);
   } elsif ($params{mode} =~ /^server::database/) {
     $self->{database} = DBD::Oracle::Server::Database->new(%params);
+  } elsif ($params{mode} =~ /^server::sqlruntime/) {
+    $self->set_local_db_thresholds(%params);
+    my $tic = time;
+      @{$self->{genericsql}} =
+          $self->{handle}->fetchrow_array($params{selectname});
+    $self->{runtime} = time - $tic;
   } elsif ($params{mode} =~ /^server::sql/) {
     $self->set_local_db_thresholds(%params);
     if ($params{regexp}) {
@@ -213,6 +219,15 @@ sub nagios {
               $self->{connection_time}, $self->{dbuser}||$self->{username});
       $self->add_perfdata(sprintf "connection_time=%.4f;%d;%d",
           $self->{connection_time},
+          $self->{warningrange}, $self->{criticalrange});
+    } elsif ($params{mode} =~ /^server::sqlruntime/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{runtime}, 1, 5),
+          sprintf "%.2f seconds to execute %s",
+              $self->{runtime},
+              $self->{name2} ? $self->{name2} : $self->{selectname});
+      $self->add_perfdata(sprintf "sql_runtime=%.4f;%d;%d",
+          $self->{runtime},
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ /^server::sql/) {
       if ($params{regexp}) {
