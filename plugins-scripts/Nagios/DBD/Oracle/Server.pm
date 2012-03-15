@@ -225,7 +225,7 @@ sub nagios {
           $self->check_thresholds($self->{runtime}, 1, 5),
           sprintf "%.2f seconds to execute %s",
               $self->{runtime},
-              $self->{name2} ? $self->{name2} : $self->{selectname});
+              $params{name2} ? $params{name2} : $params{selectname});
       $self->add_perfdata(sprintf "sql_runtime=%.4f;%d;%d",
           $self->{runtime},
           $self->{warningrange}, $self->{criticalrange});
