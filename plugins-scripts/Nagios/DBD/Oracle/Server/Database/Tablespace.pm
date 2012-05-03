@@ -395,30 +395,33 @@ sub init {
       $self->{real_bytes_free} = $self->{bytes_free};
       $self->{percent_as_bar} = '____________________';
     } else {
-      # (total - free) / total * 100 = % used
-      # (used + free - free) / ( used + free)
-      if ($self->{bytes_max} == 0) { 
-        $self->{percent_used} =
-            ($self->{bytes} - $self->{bytes_free}) / $self->{bytes} * 100;
-        $self->{real_bytes_max} = $self->{bytes};
-        $self->{real_bytes_free} = $self->{bytes_free};
-      } elsif ($self->{bytes_max} > $self->{bytes}) {
-        $self->{percent_used} =
-            ($self->{bytes} - $self->{bytes_free}) / $self->{bytes_max} * 100;
-        $self->{real_bytes_max} = $self->{bytes_max};    
-        $self->{real_bytes_free} = $self->{bytes_free} + ($self->{bytes_max} - $self->{bytes});
-      } else {
-        # alter tablespace USERS add datafile 'users02.dbf'
-        #     size 5M autoextend on next 200K maxsize 6M;
-        # bytes = 5M, maxbytes = 6M
-        # ..... data arriving...until ORA-01652: unable to extend temp segment
-        # bytes = 6M, maxbytes = 6M
-              # alter database datafile 5 resize 8M;
-        # bytes = 8M, maxbytes = 6M
-        $self->{percent_used} =
-            ($self->{bytes} - $self->{bytes_free}) / $self->{bytes} * 100;
-        $self->{real_bytes_max} = $self->{bytes};
-        $self->{real_bytes_free} = $self->{bytes_free};
+      if ($params{calcmeth} eq "classic") {
+        # (total - free) / total * 100 = % used
+        # (used + free - free) / ( used + free)
+        if ($self->{bytes_max} == 0) { 
+          $self->{percent_used} =
+              ($self->{bytes} - $self->{bytes_free}) / $self->{bytes} * 100;
+          $self->{real_bytes_max} = $self->{bytes};
+          $self->{real_bytes_free} = $self->{bytes_free};
+        } elsif ($self->{bytes_max} > $self->{bytes}) {
+          $self->{percent_used} =
+              ($self->{bytes} - $self->{bytes_free}) / $self->{bytes_max} * 100;
+          $self->{real_bytes_max} = $self->{bytes_max};    
+          $self->{real_bytes_free} = $self->{bytes_free} + ($self->{bytes_max} - $self->{bytes});
+        } else {
+          # alter tablespace USERS add datafile 'users02.dbf'
+          #     size 5M autoextend on next 200K maxsize 6M;
+          # bytes = 5M, maxbytes = 6M
+          # ..... data arriving...until ORA-01652: unable to extend temp segment
+          # bytes = 6M, maxbytes = 6M
+                # alter database datafile 5 resize 8M;
+          # bytes = 8M, maxbytes = 6M
+          $self->{percent_used} =
+              ($self->{bytes} - $self->{bytes_free}) / $self->{bytes} * 100;
+          $self->{real_bytes_max} = $self->{bytes};
+          $self->{real_bytes_free} = $self->{bytes_free};
+        }
+      } elsif ($params{calcmeth} eq "vigna") {
       }
     }
     $self->{percent_free} = 100 - $self->{percent_used};

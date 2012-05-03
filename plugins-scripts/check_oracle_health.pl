@@ -345,6 +345,7 @@ my @params = (
     "basis",
     "lookback|l=i",
     "environment|e=s%",
+    "calcmeth=s",
     "method=s",
     "runas|r=s",
     "scream",
@@ -430,6 +431,16 @@ if (exists $commandline{commit}) {
   $commandline{commit} = 1;
 } else {
   $commandline{commit} = 0;
+}
+
+if (exists $commandline{calcmeth}) {
+  if ($commandline{calcmeth} ne "classic" || $commandline{calcmeth} ne "sap" || $commandline{calcmeth} ne "classic") {
+    printf "Parameter calcmeth must be classic (which is the default), sap or java\n";
+    print_help();
+    exit $ERRORS{OK};
+  }
+} else {
+  $commandline{calcmeth} = "classic";
 }
 
 if (exists $commandline{'with-mymodules-dyn-dir'}) {
@@ -611,6 +622,7 @@ my %params = (
     verbose => $commandline{verbose},
     report => $commandline{report},
     commit => $commandline{commit},
+    calcmeth => $commandline{calcmeth},
 );
 
 my $server = undef;
