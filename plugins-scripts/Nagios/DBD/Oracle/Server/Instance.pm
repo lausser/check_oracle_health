@@ -62,10 +62,15 @@ sub init {
     });
   } elsif ($params{mode} =~ /server::instance::rman::backup::problems/) {
     $self->{rman_backup_problems} = $self->{handle}->fetchrow_array(q{
-        SELECT COUNT(*) FROM v$rman_status WHERE status != 'COMPLETED'
+        SELECT COUNT(*) FROM v$rman_status 
+        WHERE
+          operation = 'BACKUP'
+        AND
+          status != 'COMPLETED'
         AND          
-        status != 'RUNNING' 
-        AND start_time > sysdate-3
+          status != 'RUNNING' 
+        AND
+          start_time > sysdate-3
     });
   } elsif ($params{mode} =~ /server::instance::sessionusage/) {
     $self->{session_usage} = $self->{handle}->fetchrow_array(q{

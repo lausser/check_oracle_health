@@ -2,6 +2,8 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.5
+- restrict rman problems to backup-operations (not list, report..) (Thanks marekel)
 
 1.7.4 - 2012-03-15
 - bugfix in timeout-alarm handling under windows (Thanks Marian Jamrich)
