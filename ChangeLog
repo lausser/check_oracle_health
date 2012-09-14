@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.5.1
+- fix a bug in sga-library-cache-reloads (thresholds compared against pinhits) (Thanks claney)
+
 1.7.5
 - restrict rman problems to backup-operations (not list, report..) (Thanks marekel)
 

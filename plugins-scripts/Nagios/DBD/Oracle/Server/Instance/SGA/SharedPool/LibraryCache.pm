@@ -96,7 +96,7 @@ sub nagios {
     } elsif ($params{mode} =~ 
         /server::instance::sga::sharedpool::librarycache::reloads/) {
       $self->add_nagios(
-          $self->check_thresholds($self->{pin_hitratio}, "10", "100"),
+          $self->check_thresholds($self->{reload_rate}, "10", "100"),
           sprintf "SGA library cache reloads %.2f/sec", $self->{reload_rate});
       $self->add_perfdata(sprintf "sga_library_cache_reloads_per_sec=%.2f;%s;%s",
           $self->{reload_rate}, $self->{warningrange}, $self->{criticalrange});
