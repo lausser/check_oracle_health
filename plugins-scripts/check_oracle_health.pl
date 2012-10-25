@@ -434,7 +434,7 @@ if (exists $commandline{commit}) {
 }
 
 if (exists $commandline{calcmeth}) {
-  if ($commandline{calcmeth} ne "classic" || $commandline{calcmeth} ne "sap" || $commandline{calcmeth} ne "classic") {
+  if ($commandline{calcmeth} ne "classic" && $commandline{calcmeth} ne "sap" && $commandline{calcmeth} ne "classic") {
     printf "Parameter calcmeth must be classic (which is the default), sap or java\n";
     print_help();
     exit $ERRORS{OK};

@@ -4,6 +4,7 @@
 
 1.7.5.1
 - fix a bug in sga-library-cache-reloads (thresholds compared against pinhits) (Thanks claney)
+- fix a bug in calcmeth which only is visible with --environ (Thanks Pullistricker)
 
 1.7.5
 - restrict rman problems to backup-operations (not list, report..) (Thanks marekel)
