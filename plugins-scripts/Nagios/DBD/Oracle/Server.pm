@@ -327,27 +327,22 @@ sub check_thresholds {
       $self->{warningrange} : $defaultwarningrange;
   $self->{criticalrange} = defined $self->{criticalrange} ?
       $self->{criticalrange} : $defaultcriticalrange;
-  if ($self->{warningrange} !~ /:/ && $self->{criticalrange} !~ /:/) {
-    # warning = 10, critical = 20, warn if > 10, crit if > 20
+  if ($self->{warningrange} !~ /:/ ) {
+	# warning = 10, warn if > 10
     $level = $ERRORS{WARNING} if $value > $self->{warningrange};
-    $level = $ERRORS{CRITICAL} if $value > $self->{criticalrange};
-  } elsif ($self->{warningrange} =~ /(\d+):/ && 
-      $self->{criticalrange} =~ /(\d+):/) {
-    # warning = 98:, critical = 95:, warn if < 98, crit if < 95
+  } elsif ($self->{warningrange} =~ /(\d+):/ ) {
+	# warning = 10:, warn if < 10
     $self->{warningrange} =~ /(\d+):/;
     $level = $ERRORS{WARNING} if $value < $1;
-    $self->{criticalrange} =~ /(\d+):/;
-    $level = $ERRORS{CRITICAL} if $value < $1;
-  } elsif ($self->{warningrange} !~ /:/ && $self->{criticalrange} =~ /:/) {
-    # warning = 10, critical = 20:, warn if > 10, crit if < 20
-    $level = $ERRORS{WARNING} if $value > $self->{warningrange};
-    $self->{criticalrange} =~ /(\d+):/;
-    $level = $ERRORS{CRITICAL} if $value < $1;
-  } elsif ($self->{warningrange} =~ /:/ && $self->{criticalrange} !~ /:/) {
-    # warning = 10:, critical = 20, warn if < 10, crit if > 20
-    $self->{warningrange} =~ /(\d+):/;
-    $level = $ERRORS{WARNING} if $value < $1;
+  } 
+
+  if ($self->{criticalrange} !~ /:/) {
+	# critical = 20, warn if > 20
     $level = $ERRORS{CRITICAL} if $value > $self->{criticalrange};
+  } elsif ($self->{criticalrange} =~ /(\d+):/) {
+	# critical = 20: crit if < 20
+    $self->{criticalrange} =~ /(\d+):/;
+    $level = $ERRORS{CRITICAL} if $value < $1;
   }
   return $level;
   #
