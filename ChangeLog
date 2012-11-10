@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.6 - 2012-11-10
+- implemented all sorts of thresholds (Thanks Simon Meggle)
+
 1.7.5.1
 - fix a bug in sga-library-cache-reloads (thresholds compared against pinhits) (Thanks claney)
 - fix a bug in calcmeth which only is visible with --environ (Thanks Pullistricker)
