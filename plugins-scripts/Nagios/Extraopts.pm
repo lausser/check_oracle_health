@@ -21,7 +21,7 @@ sub new {
 
 sub prepare_file_and_section {
   my $self = shift;
-  if (! defined $self->{file}) {
+  if (! defined $self->{file} || ! $self->{file}) {
     # ./check_stuff --extra-opts
     $self->{section} = basename($0);
     $self->{file} = $self->get_default_file();

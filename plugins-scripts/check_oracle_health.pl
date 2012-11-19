@@ -504,6 +504,13 @@ if ($needs_restart) {
         push(@newargv, sprintf "--%s", $option);
         push(@newargv, sprintf "%s", $commandline{$option});
       }
+    } elsif (grep { /^$option/ && /:/ } @params) {
+      if ($commandline{$option}) {
+        push(@newargv, sprintf "--%s", $option);
+        push(@newargv, sprintf "%s", $commandline{$option});
+      } else {
+        push(@newargv, sprintf "--%s", $option);
+      }
     } else {
       push(@newargv, sprintf "--%s", $option);
     }
