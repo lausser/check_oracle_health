@@ -37,6 +37,18 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
         } else {
           next if $params{selectname} && lc $params{selectname} ne lc $name;
         }
+        my %thisparams = %params;
+        $thisparams{name} = $name;
+        $thisparams{valid_days} = $valid_days;
+        $thisparams{status} = $status;
+        my $user = DBD::Oracle::Server::Database::User->new(
+            %thisparams);
+        add_user($user);
+        $num_users++;
+      }
+      if (! $num_users) {
+        $initerrors = 1;
+        return undef;
       }
     }
   }
