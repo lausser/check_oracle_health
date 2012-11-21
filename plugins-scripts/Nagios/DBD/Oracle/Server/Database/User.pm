@@ -28,7 +28,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
           SELECT
               username, expiry_date - sysdate, account_status
           FROM
-              dba_users;
+              dba_users
       });
       foreach (@pwresult) {
         my ($name, $valid_days, $status) = @{$_};
