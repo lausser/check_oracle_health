@@ -72,37 +72,37 @@ sub new {
 
 sub init {
   my $self = shift;
-printf "%s\n", Data::Dumper::Dumper($self);
+  $self->init_nagios();
 }
 
 sub nagios {
   my $self = shift;
-  if ($status eq "EXPIRED") {
+  if ($self->{status} eq "EXPIRED") {
     $self->add_nagios_critical(sprintf "password of user %s has expired",
         $self->{name});
-  } elsif ($status eq "EXPIRED (GRACE)") {
+  } elsif ($self->{status} eq "EXPIRED (GRACE)") {
     $self->add_nagios_warning(sprintf "password of user %s soon expires",
         $self->{name});
-  } elsif ($status eq "LOCKED (TIMED)") {
+  } elsif ($self->{status} eq "LOCKED (TIMED)") {
     $self->add_nagios_warning(sprintf "user %s is temporarily locked",
         $self->{name});
-  } elsif ($status eq "LOCKED") {
+  } elsif ($self->{status} eq "LOCKED") {
     $self->add_nagios_critical(sprintf "user %s is locked",
         $self->{name});
-  } elsif ($status eq "EXPIRED & LOCKED(TIMED)") {
+  } elsif ($self->{status} eq "EXPIRED & LOCKED(TIMED)") {
     $self->add_nagios_critical(sprintf "password of user %s has expired and is temporarily locked",
         $self->{name});
-  } elsif ($status eq "EXPIRED(GRACE) & LOCKED(TIMED)") {
+  } elsif ($self->{status} eq "EXPIRED(GRACE) & LOCKED(TIMED)") {
     $self->add_nagios_warning(sprintf "password of user %s soon expires and is temporarily locked",
         $self->{name});
-  } elsif ($status eq "EXPIRED & LOCKED") {
+  } elsif ($self->{status} eq "EXPIRED & LOCKED") {
     $self->add_nagios_critical(sprintf "password of user %s has expired and is locked",
         $self->{name});
-  } elsif ($status eq "EXPIRED(GRACE) & LOCKED") {
+  } elsif ($self->{status} eq "EXPIRED(GRACE) & LOCKED") {
     $self->add_nagios_critical(sprintf "password of user %s soon expires and is locked",
         $self->{name});
   }
-  if ($status eq "OPEN") {
+  if ($self->{status} eq "OPEN") {
     if (defined $self->{valid_days}) {
       $self->add_nagios(
           $self->check_thresholds($self->{valid_days}, "7:", "3:"),
