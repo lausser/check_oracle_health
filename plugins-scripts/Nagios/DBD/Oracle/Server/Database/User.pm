@@ -62,7 +62,7 @@ sub new {
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
     name => $params{name},
-    valid_days => $params{name} || 999999,
+    valid_days => $params{valid_days} || 999999,
     status => $params{status},
   };
   bless $self, $class;
@@ -77,6 +77,47 @@ printf "%s\n", Data::Dumper::Dumper($self);
 
 sub nagios {
   my $self = shift;
+  if ($status eq "EXPIRED") {
+    $self->add_nagios_critical(sprintf "password of user %s has expired",
+        $self->{name});
+  } elsif ($status eq "EXPIRED (GRACE)") {
+    $self->add_nagios_warning(sprintf "password of user %s soon expires",
+        $self->{name});
+  } elsif ($status eq "LOCKED (TIMED)") {
+    $self->add_nagios_warning(sprintf "user %s is temporarily locked",
+        $self->{name});
+  } elsif ($status eq "LOCKED") {
+    $self->add_nagios_critical(sprintf "user %s is locked",
+        $self->{name});
+  } elsif ($status eq "EXPIRED & LOCKED(TIMED)") {
+    $self->add_nagios_critical(sprintf "password of user %s has expired and is temporarily locked",
+        $self->{name});
+  } elsif ($status eq "EXPIRED(GRACE) & LOCKED(TIMED)") {
+    $self->add_nagios_warning(sprintf "password of user %s soon expires and is temporarily locked",
+        $self->{name});
+  } elsif ($status eq "EXPIRED & LOCKED") {
+    $self->add_nagios_critical(sprintf "password of user %s has expired and is locked",
+        $self->{name});
+  } elsif ($status eq "EXPIRED(GRACE) & LOCKED") {
+    $self->add_nagios_critical(sprintf "password of user %s soon expires and is locked",
+        $self->{name});
+  }
+  if ($status eq "OPEN") {
+    if (defined $self->{valid_days}) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{valid_days}, "7:", "3:"),
+          sprintf("password of user %s will expire in %d days",
+              $self->{name}, $self->{valid_days}));
+      $self->add_perfdata(sprintf "\'pw_%s_valid\'=%.2f;%s;%s",
+          lc $self->{name}, $self->{valid_days},
+          $self->{warningrange}, $self->{criticalrange});
+    } else {
+      $self->add_nagios_ok(sprintf "password of user %s will never expire",
+          $self->{name});
+      $self->add_perfdata(sprintf "\'pw_%s_valid\'=0;0;0",
+          lc $self->{name});
+    }
+  }
 }
 
 1;
