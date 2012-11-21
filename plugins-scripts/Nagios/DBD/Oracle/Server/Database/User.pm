@@ -62,7 +62,7 @@ sub new {
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
     name => $params{name},
-    valid_days => $params{valid_days} || 999999,
+    valid_days => $params{valid_days},
     status => $params{status},
   };
   bless $self, $class;
