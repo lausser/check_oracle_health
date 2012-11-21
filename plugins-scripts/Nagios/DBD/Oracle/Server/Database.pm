@@ -25,6 +25,7 @@ sub new {
     tablespaces => [],
     num_datafiles => undef,
     num_datafiles_max => undef,
+    dbusers => [],
   };
   bless $self, $class;
   $self->init(%params);
@@ -67,6 +68,14 @@ sub init {
     if (! defined $self->{num_datafiles_max} ||
       ! defined $self->{num_datafiles}) {
       $self->add_nagios_critical("unable to get number of datafiles");
+    }
+  } elsif ($params{mode} =~ /server::database::expiredpw/) {
+    DBD::Oracle::Server::Database::User::init_users(%params);
+    if (my @users = 
+        DBD::Oracle::Server::Database::User::return_users()) {
+      $self->{users} = \@users;
+    } else {
+      $self->add_nagios_critical("unable to aquire user info");
     }
   }
 }
@@ -243,6 +252,11 @@ sub nagios {
           $self->{num_datafiles_max} / 100 * $self->{warningrange},
           $self->{num_datafiles_max} / 100 * $self->{criticalrange},
           $self->{num_datafiles_max});
+    } elsif ($params{mode} =~ /server::database::expiredpw/) {
+      foreach (@{$self->{users}}) {
+        $_->nagios(%params);
+        $self->merge_nagios($_);
+      }
     }
   }
 }
