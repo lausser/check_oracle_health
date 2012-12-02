@@ -262,6 +262,10 @@ EOUS
   Tablespace-related modes check all tablespaces in one run by default.
   If only a single tablespace should be checked, use the --name parameter.
   The same applies to datafile-related modes.
+  If an additional --regexp is added, --name's argument will be interpreted
+  as a regular expression.
+  The parameter --mitigation lets you classify the severity of an offline
+  tablespace. 
 
   tablespace-remaining-time will take historical data into account. The number
   of days in the past can be given with the --lookback parameter. (Default: 30)
@@ -337,6 +341,9 @@ my @params = (
     "tablespace=s",
     "datafile=s",
     "waitevent=s",
+    "offlineok",
+    "mitigation=s",
+    "notemp",
     "name=s",
     "name2=s",
     "regexp",
@@ -621,6 +628,9 @@ my %params = (
     tablespace => $commandline{tablespace},
     datafile => $commandline{datafile},
     basis => $commandline{basis},
+    offlineok => $commandline{offlineok},
+    mitigation => $commandline{mitigation},
+    notemp => $commandline{notemp},
     selectname => $commandline{name} || $commandline{tablespace} || $commandline{datafile},
     regexp => $commandline{regexp},
     name => $commandline{name},

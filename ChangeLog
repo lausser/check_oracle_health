@@ -2,7 +2,8 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
-- 2012
+1.7.7 - 2012-11-29
+- add parameter --mitigation and --notemp
 
 1.7.6.1 - 2012-11-19
 - fix a bug with --extra-opts and --environ

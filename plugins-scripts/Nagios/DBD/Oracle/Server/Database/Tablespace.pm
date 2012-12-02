@@ -224,6 +224,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
       }
       foreach (@tablespaceresult) {
         my ($name, $status, $type, $extentmgmt, $bytes, $bytes_max, $bytes_free) = @{$_};
+        next if $params{notemp} && ($type eq "UNDO" || $type eq "TEMPORARY");
         if ($params{regexp}) {
           next if $params{selectname} && $name !~ /$params{selectname}/;
         } else {
@@ -504,11 +505,13 @@ sub nagios {
       if (! $self->{bytes_max}) {
         $self->check_thresholds($self->{percent_used}, "90", "98");
         if ($self->{status} eq 'offline') {
-          $self->add_nagios_warning(
+          $self->add_nagios(
+              defined $params{mitigation} ? $params{mitigation} : 1,
               sprintf("tbs %s is offline", $self->{name})
           );
         } else {
-          $self->add_nagios_critical(
+          $self->add_nagios(
+              defined $params{mitigation} ? $params{mitigation} : 2,
               sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
           );
         }
@@ -573,6 +576,17 @@ sub nagios {
         if (! $self->{bytes_max}) {
           $self->check_thresholds($self->{percent_used}, "5:", "2:");
           if ($self->{status} eq 'offline') {
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 1,
+                sprintf("tbs %s is offline", $self->{name})
+            );
+          } else {
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 2,
+                sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
+            );
+          }
+          if ($self->{status} eq 'offline') {
             $self->add_nagios_warning(
                 sprintf("tbs %s is offline", $self->{name})
             );
@@ -627,12 +641,14 @@ sub nagios {
           $self->{criticalrange} .= ':';
           $self->check_thresholds($self->{real_bytes_free}, "5242880:", "1048576:");      
           if ($self->{status} eq 'offline') {
-            $self->add_nagios_warning(
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 1,
                 sprintf("tbs %s is offline", $self->{name})
             );
           } else {
-            $self->add_nagios_critical(
-                sprintf("tbs %s has a problem, maybe needs recovery?", $self->{name})     
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 2,
+                sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
             );
           }
         } else {
