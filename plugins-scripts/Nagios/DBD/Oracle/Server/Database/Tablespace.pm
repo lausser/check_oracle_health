@@ -225,6 +225,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
       foreach (@tablespaceresult) {
         my ($name, $status, $type, $extentmgmt, $bytes, $bytes_max, $bytes_free) = @{$_};
         next if $params{notemp} && ($type eq "UNDO" || $type eq "TEMPORARY");
+        next if $params{noreadonly} && ($status eq "READ ONLY");
         if ($params{regexp}) {
           next if $params{selectname} && $name !~ /$params{selectname}/;
         } else {

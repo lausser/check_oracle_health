@@ -3,7 +3,7 @@
 ###############################################
 
 1.7.7 - 2012-11-29
-- add parameter --mitigation and --notemp
+- add parameter --mitigation and --notemp and --noreadonly
 
 1.7.6.1 - 2012-11-19
 - fix a bug with --extra-opts and --environ
