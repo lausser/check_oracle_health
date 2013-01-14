@@ -1262,7 +1262,12 @@ sub init {
     } elsif ($self->{connect} && $self->{username} && $self->{password}) {
       # --connect bba --username nagios --password oradbmon
       $self->{sid} = $self->{connect};
-      $self->{loginstring} = "traditional";
+      if ($self->{username} eq "sys") {
+        delete $ENV{TWO_TASK};
+        $self->{loginstring} = "sys";
+      } else {
+        $self->{loginstring} = "traditional";
+      }
     } else {
       $self->{errstr} = "Please specify database, username and password";
       return undef;

@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.7.1 - 2013-01-14
+- bugfix in sqlplus connect with a sys user
+
 1.7.7 - 2012-11-29
 - add parameter --mitigation and --notemp and --noreadonly
 
