@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.7.3 - 2013-02-21
+- bugfix in add_nagios, raising a deprecated-message in perl. (Thanks Philip Griesbacher)
+
 1.7.7.2 - 2013-01-22
 - optimized tablespace-can-allocate-next (Thanks Thomas Koerblein)
 
