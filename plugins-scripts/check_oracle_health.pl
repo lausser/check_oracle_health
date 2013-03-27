@@ -408,6 +408,25 @@ if ($commandline{mode} eq "encode") {
   $input =~ s/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg;
   printf "%s\n", $input;
   exit $ERRORS{OK};
+} elsif ($commandline{mode} eq "decode") {
+  if (! -t STDIN) {
+  #if (tell(STDIN) == -1) {
+    my $input = <>;
+    chomp $input;
+    $input =~ s/%([A-Za-z0-9]{2})/chr(hex($1))/seg;
+    printf "%s\n", $input;
+    exit $ERRORS{OK};
+  } else {
+    if (exists $commandline{name}) {
+      my $input = $commandline{name};
+      $input =~ s/%([A-Za-z0-9]{2})/chr(hex($1))/seg;
+      printf "%s\n", $input;
+      exit $ERRORS{OK};
+    } else {
+      printf "i can't find your encoded statement. use --name or pipe it in my stdin\n";
+      exit $ERRORS{UNKNOWN};
+    }
+  }
 }
 
 if (exists $commandline{3}) {
