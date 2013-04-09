@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.8.1 - 2013-04-09
+- cleanup leftover temp-files (written by method sqlplus)
+
 1.7.8 - 2013-03-27
 - added mode decode
 

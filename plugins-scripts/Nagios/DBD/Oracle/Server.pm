@@ -1177,16 +1177,14 @@ sub init {
   $self->{loginstring} = "traditional";
   my $template = $self->{mode}.'XXXXX';
   my $now = time;
-  if ($^O =~ /MSWin/) {
-    $template =~ s/::/_/g;
-    # This is no longer necessary. (Explanation in fetchrow_array "best practice".
-    # But maybe we have crap files for whatever reason.
-    my $pattern = $template;
-    $pattern =~ s/XXXXX$//g;
-    foreach (glob $self->system_tmpdir().'/'.$pattern.'*') {
-      if (/\.(sql|out|err)$/) {
+  if (1) {
+    # Maybe we have crap files for whatever reason.
+    foreach (glob $self->system_tmpdir().'/'.$self->{mode}.'?????.*') {
+      if (/\.(sql|out|err|temp)$/) {
         if (($now - (stat $_)[9]) > 300) {
-          unlink $_;
+          eval {
+            unlink $_;
+          };
         }
       }
     }
