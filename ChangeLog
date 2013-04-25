@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.7.8.2 - 2013-04-26
+- fix a bug in the online help
+
 1.7.8.1 - 2013-04-09
 - cleanup leftover temp-files (written by method sqlplus)
 

@@ -276,8 +276,8 @@ EOUS
   --name="select count(*) from v\$session where status = 'ACTIVE'"
   you can say 
   --name=select%20count%28%2A%29%20from%20v%24session%20where%20status%20%3D%20%27ACTIVE%27
-  For your convenience you can call check_oracle_health with the --encode
-  option and it will encode the standard input.
+  For your convenience you can call check_oracle_health with --mode encode
+  and it will encode the standard input.
 
 EOUS
 #
