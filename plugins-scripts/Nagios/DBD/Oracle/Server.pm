@@ -75,7 +75,8 @@ sub new {
       $self->{parallel} = 'no';
     } else {
       ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel}, $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(
-          q{ select dbms_utility.port_string,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
+          q{ select d.platform_name,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
+          #q{ select dbms_utility.port_string,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
       #$self->{os} = $self->{handle}->fetchrow_array(
       #    q{ SELECT dbms_utility.port_string FROM dual });
       #$self->{dbuser} = $self->{handle}->fetchrow_array(
@@ -909,6 +910,7 @@ package DBD::Oracle::Server::Connection::Dbi;
 
 use strict;
 use Net::Ping;
+use DBD::Oracle qw(:ora_session_modes);
 
 our @ISA = qw(DBD::Oracle::Server::Connection);
 
@@ -975,15 +977,16 @@ sub init {
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
       my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
+      my $username = $self->{username};
       if ($self->{username} eq "sys" || $self->{username} eq "sysdba") {
         $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
-              #ora_session_mode => DBD::Oracle::ORA_SYSDBA   
-              ora_session_mode => 0x0002  };
+              ora_session_mode => DBD::Oracle::ORA_SYSDBA   };
         $dsn = sprintf "DBI:Oracle:";
+        $username = '';
       }
       if ($self->{handle} = DBI->connect(
           $dsn,
-          $self->{username},
+          $username,
           $self->{password},
           $connecthash)) {
         $self->{handle}->do(q{
