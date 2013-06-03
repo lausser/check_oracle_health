@@ -52,6 +52,8 @@ sub init {
     } else {
       $self->add_nagios_critical("unable to aquire flash recovery area info");
     }
+  } elsif ($params{mode} =~ /server::database::dataguard/) {
+    $self->{dataguard} = DBD::Oracle::Server::Database::Dataguard->new(%params);
   } elsif ($params{mode} =~ /server::database::invalidobjects/) {
     $self->init_invalid_objects(%params);
   } elsif ($params{mode} =~ /server::database::stalestats/) {
@@ -196,6 +198,9 @@ sub nagios {
         $_->nagios(%params);
         $self->merge_nagios($_);
       }
+    } elsif ($params{mode} =~ /server::database::dataguard/) {
+      $self->{dataguard}->nagios(%params);
+      $self->merge_nagios($self->{dataguard});
     } elsif ($params{mode} =~ /server::database::invalidobjects/) {
       my @message = ();
       push(@message, sprintf "%d invalid objects",

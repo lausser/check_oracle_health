@@ -21,6 +21,7 @@ EXTRA_MODULES=\
   Nagios/DBD/Oracle/Server/Instance/Sysstat.pm \
   Nagios/DBD/Oracle/Server/Instance.pm \
   Nagios/DBD/Oracle/Server/Database/User.pm \
+  Nagios/DBD/Oracle/Server/Database/Dataguard.pm \
   Nagios/DBD/Oracle/Server/Database/FlashRecoveryArea.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace/Datafile.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace/Segment.pm \
