@@ -2,6 +2,10 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8 - 2013-06-04
+- Don Seiler implemented modes dataguard-lag and dataguard-mrp-status
+  A big thank to Don! Monitoring of Oracle Data Guard is now possible
+
 1.7.8.2 - 2013-04-26
 - fix a bug in the online help
 
