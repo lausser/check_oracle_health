@@ -968,11 +968,30 @@ sub init {
           die "alarm\n";
         };
       } else {
-        my $mask = POSIX::SigSet->new( SIGALRM );
-        my $action = POSIX::SigAction->new(
-            sub { die "alarm\n" ; }, $mask);
-        my $oldaction = POSIX::SigAction->new();
-        sigaction(SIGALRM ,$action ,$oldaction );
+        POSIX::setpgid(0, 0);
+        my $alrm_mask = POSIX::SigSet->new(SIGALRM);
+        my $term_mask = POSIX::SigSet->new(SIGTERM);
+        my $alrm_action = POSIX::SigAction->new(
+            sub {
+                if (1) {
+                  printf "CRITICAL - timeout\n";
+                  kill 9, 0;
+                } else {
+                  die "timeout alarm\n" ;
+                }
+            }, $alrm_mask);
+        my $term_action = POSIX::SigAction->new(
+            sub {
+                if (1) {
+                  printf "CRITICAL - received TERM signal\n";
+                  kill 9, 0;
+                } else {
+                  die "sigterm\n" ;      
+                }
+            }, $term_mask);
+        my $old_action = POSIX::SigAction->new();
+        POSIX::sigaction(SIGALRM, $alrm_action, $old_action);
+        POSIX::sigaction(SIGTERM, $term_action, $old_action);
       }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
