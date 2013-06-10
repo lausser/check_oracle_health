@@ -910,7 +910,6 @@ package DBD::Oracle::Server::Connection::Dbi;
 
 use strict;
 use Net::Ping;
-use DBD::Oracle qw(:ora_session_modes);
 
 our @ISA = qw(DBD::Oracle::Server::Connection);
 
@@ -999,7 +998,7 @@ sub init {
       my $username = $self->{username};
       if ($self->{username} eq "sys" || $self->{username} eq "sysdba") {
         $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
-              ora_session_mode => DBD::Oracle::ORA_SYSDBA   };
+              ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA
         $dsn = sprintf "DBI:Oracle:";
         $username = '';
       }

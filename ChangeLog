@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8.0.1 - 2013-06-10
+- bugfix in sysdba-connect
+
 1.8 - 2013-06-04
 - Don Seiler implemented modes dataguard-lag and dataguard-mrp-status
   A big thank to Don! Monitoring of Oracle Data Guard is now possible
