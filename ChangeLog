@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8.1 - 2013-07-02
+- mode sqlplus can execute stored procedures 
+
 1.8.0.1 - 2013-06-10
 - bugfix in sysdba-connect
 

@@ -1633,13 +1633,8 @@ sub convert {
 sub execute {
   my $self = shift;
   my $sql = shift;
-  eval {
-    my $sth = $self->{handle}->prepare($sql);
-    $sth->execute();
-  };
-  if ($@) {
-    printf STDERR "bumm %s\n", $@;
-  }
+  my @arguments = @_;
+  return $self->fetchrow_array($sql, @arguments);
 }
 
 sub DESTROY {
