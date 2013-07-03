@@ -91,10 +91,23 @@ sub init_invalid_objects {
   my $unrecoverable_datafiles = undef;
   $self->{invalidobjects}->{invalid_objects} =
       $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_objects 
-          WHERE status = 'INVALID' AND object_name NOT LIKE 'BIN$%'
-      });
+          SELECT
+            COUNT(*)
+          FROM
+            dba_objects O
+          LEFT OUTER JOIN
+            DBA_MVIEW_refresh_times V
+          ON
+            O.object_name = V.NAME
+          AND
+            O.owner = V.owner
+          WHERE
+            (LAST_REFRESH <= (SELECT sysdate - ? FROM dual) OR LAST_REFRESH is null)
+          AND
+            STATUS = 'INVALID'
+          AND
+            O.object_name NOT LIKE 'BIN$%'
+      }, ($params{lookback} || 2));
   # should be only N/A or VALID
   $self->{invalidobjects}->{invalid_indexes} =
       $self->{handle}->fetchrow_array(q{
