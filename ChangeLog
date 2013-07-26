@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8.1.2 - 2013-07-26
+- --mode sql --name2 ":<label>" suppresses the output of the numerical result
+
 1.8.1.1 - 2013-07-04
 - invalid-objects takes refresh delay (default: 2 days) into account. Thanks @chtyo)
 

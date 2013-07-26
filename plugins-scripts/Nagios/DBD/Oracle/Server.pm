@@ -255,15 +255,23 @@ sub nagios {
           }
         }
       } else {
+        my $label = $params{name2};
+        my $showvalue = 1;
+        if (substr($label, 0, 1) eq ":") {
+          # --name "select status from backup" --name2 ":backup status"
+          # sometimes the numerical returncode is not relevant
+          $label = substr($label, 1);
+          $showvalue = 0;
+        }
         $self->add_nagios(
             # the first item in the list will trigger the threshold values
             $self->check_thresholds($self->{genericsql}[0], 1, 5),
                 sprintf "%s: %s%s",
-                $params{name2} ? lc $params{name2} : lc $params{selectname},
+                $label ? lc $label : lc $params{selectname},
                 # float as float, integers as integers
-                join(" ", map {
+                $showvalue ? join(" ", map {
                     (sprintf("%d", $_) eq $_) ? $_ : sprintf("%f", $_)
-                } @{$self->{genericsql}}),
+                } @{$self->{genericsql}}) : "",
                 $params{units} ? $params{units} : "");
         my $i = 0;
         # workaround... getting the column names from the database would be nicer
