@@ -1241,7 +1241,7 @@ sub init {
     }
   } else {
     if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)/) {
+        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)(:(\d+))*(\/([\w\-\._]+))*/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
       $self->{username} = $1;
@@ -1251,7 +1251,14 @@ sub init {
         delete $ENV{TWO_TASK};
         $self->{loginstring} = "sys";
       } else {
-        $self->{loginstring} = "traditional";
+        if ($7) {
+          $self->{dbhost} = $3;
+          $self->{dbport} = $5 || 1521;
+          $self->{dbservice} = $7;
+          $self->{loginstring} = "easyconnect";
+        } else {
+          $self->{loginstring} = "traditional";
+        }
       }
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
         $self->{connect} =~ /sysdba@([\w\-\._]+)/) {
@@ -1413,6 +1420,11 @@ sub init {
           $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
+              $self->{sql_commandfile}, $self->{sql_outfile};
+        } elsif ($self->{loginstring} eq "easyconnect") {
+          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s:%d/%s\" < %s > %s",
+              $sqlplus,
+              $self->{username}, $self->{password}, $self->{dbhost}, $self->{dbport}, $self->{dbservice},
               $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "extauth") {
           $self->{sqlplus} = sprintf "%s -S / < %s > %s",
