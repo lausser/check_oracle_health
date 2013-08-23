@@ -266,8 +266,9 @@ sub nagios {
         $self->add_nagios(
             # the first item in the list will trigger the threshold values
             $self->check_thresholds($self->{genericsql}[0], 1, 5),
-                sprintf "%s: %s%s",
+                sprintf "%s%s %s%s",
                 $label ? lc $label : lc $params{selectname},
+                $showvalue ? ":" : "",
                 # float as float, integers as integers
                 $showvalue ? join(" ", map {
                     (sprintf("%d", $_) eq $_) ? $_ : sprintf("%f", $_)
