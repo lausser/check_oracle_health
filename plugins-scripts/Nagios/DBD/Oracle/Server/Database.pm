@@ -89,10 +89,10 @@ sub init_invalid_objects {
   my $invalid_indexes = undef;
   my $invalid_ind_partitions = undef;
   my $unrecoverable_datafiles = undef;
-  $self->{invalidobjects}->{invalid_objects} =
-      $self->{handle}->fetchrow_array(q{
+  @{$self->{invalidobjects}->{invalid_objects_list}} =
+      $self->{handle}->fetchall_array(q{
           SELECT
-            COUNT(*)
+            'dba_objects', O.object_type||' '||O.owner||'.'||O.object_name||' is '||O.status
           FROM
             dba_objects O
           LEFT OUTER JOIN
@@ -108,27 +108,31 @@ sub init_invalid_objects {
           AND
             O.object_name NOT LIKE 'BIN$%'
       }, ($params{lookback} || 2));
+  $self->{invalidobjects}->{invalid_objects} = scalar(@{$self->{invalidobjects}->{invalid_objects_list}});
   # should be only N/A or VALID
-  $self->{invalidobjects}->{invalid_indexes} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_indexes 
+  @{$self->{invalidobjects}->{invalid_indexes_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT 'dba_indexes', index_type||' index '||owner||'.'||index_name||' of '||table_owner||'.'||table_name||' is '||status
+          FROM dba_indexes
           WHERE status <> 'VALID' AND status <> 'N/A'
       });
+  $self->{invalidobjects}->{invalid_indexes} = scalar(@{$self->{invalidobjects}->{invalid_indexes_list}});
   # should be only USABLE
-  $self->{invalidobjects}->{invalid_ind_partitions} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_ind_partitions 
+  @{$self->{invalidobjects}->{invalid_ind_partitions_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT 'dba_ind_partitions', partition_name||' of '||index_owner||'.'||index_name||' is '||status
+          FROM dba_ind_partitions
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
+  $self->{invalidobjects}->{invalid_ind_partitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_partitions_list}});
   # should be only VALID
-  $self->{invalidobjects}->{invalid_registry_components} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
+  @{$self->{invalidobjects}->{invalid_registry_components_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT 'dba_registry', namespace||'.'||comp_name||'-'||version||' is '||status
           FROM dba_registry
           WHERE status <> 'VALID'
       });
+  $self->{invalidobjects}->{invalid_registry_components} = scalar(@{$self->{invalidobjects}->{invalid_registry_components_list}});
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
       ! defined $self->{invalidobjects}->{invalid_indexes} ||
       ! defined $self->{invalidobjects}->{invalid_registry_components} ||
@@ -216,6 +220,8 @@ sub nagios {
       $self->merge_nagios($self->{dataguard});
     } elsif ($params{mode} =~ /server::database::invalidobjects/) {
       my @message = ();
+      my $message = undef;
+      my $level = undef;
       push(@message, sprintf "%d invalid objects",
           $self->{invalidobjects}->{invalid_objects}) if
           $self->{invalidobjects}->{invalid_objects};
@@ -229,17 +235,78 @@ sub nagios {
           $self->{invalidobjects}->{invalid_registry_components}) if
           $self->{invalidobjects}->{invalid_registry_components};
       if (scalar(@message)) {
-        $self->add_nagios($self->check_thresholds(
+        my $level = $self->check_thresholds(
             $self->{invalidobjects}->{invalid_objects} +
             $self->{invalidobjects}->{invalid_indexes} +
             $self->{invalidobjects}->{invalid_registry_components} +
-            $self->{invalidobjects}->{invalid_ind_partitions}, 0.1, 0.1),
-            join(", ", @message));
+            $self->{invalidobjects}->{invalid_ind_partitions}, 0.1, 0.1);
+        $self->add_nagios($level, join(", ", @message));
+        $message = $ERRORCODES{$level}.' - '.join(", ", @message);
+$self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
       } else {
         $self->add_nagios_ok("no invalid objects found");
+        $message = "OK - no invalid objects found";
+$self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
       }
-      foreach (sort keys %{$self->{invalidobjects}}) {
+      foreach (grep !/_list$/, sort keys %{$self->{invalidobjects}}) {
         $self->add_perfdata(sprintf "%s=%d", $_, $self->{invalidobjects}->{$_});
+      }
+      if ($self->{nagios_level} && $params{report} eq "html") {
+        require List::Util;
+        my $maxlines = 10;
+        my $invalid_lines = 0;
+        my $linespercategory = {};
+
+        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
+          $invalid_lines += scalar(@{$self->{invalidobjects}->{$list}});
+          $linespercategory->{$list} = 0;
+    #scalar(@{$self->{invalidobjects}->{$list}});
+        }
+        my $output_lines = List::Util::sum(values %{$linespercategory});
+        my $full = 0;
+        do {
+          foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
+            $linespercategory->{$list}++ if scalar(@{$self->{invalidobjects}->{$list}}) > $linespercategory->{$list};
+            $output_lines = List::Util::sum(values %{$linespercategory});
+            $full = 1 if ($output_lines >= $maxlines || $output_lines >= $invalid_lines);
+            last if $full;
+          }
+        } while (! $full);
+        printf "%s\n", $message;
+        printf "<table style=\"border-collapse:collapse; border: 1px solid black;\">";
+        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
+          if ($linespercategory->{$list}) {
+        printf "<tr>";
+        foreach (qw(Table Object)) {
+          printf "<th style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</th>", $_;
+        }
+        printf "</tr>";
+            foreach my $object (@{$self->{invalidobjects}->{$list}}[0..$linespercategory->{$list} - 1]) {
+
+              printf "<tr>";
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</td>", $object->[0];
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px; white-space: nowrap\">%s</td>", $object->[1];
+              printf "</tr>";
+            }
+            if ($linespercategory->{$list} < scalar(@{$self->{invalidobjects}->{$list}})) {
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td colspan=\"2\" class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">... (%d more)</td>", scalar(@{$self->{invalidobjects}->{$list}}) - $linespercategory->{$list};
+              printf "</tr>";
+            }
+          }
+        }
+        printf "</table>\n";
+        printf "<!--\nASCII_NOTIFICATION_START\n";
+        foreach (qw(Table Object)) {
+          printf "%-20s", $_;
+        }
+        printf "\n";
+        foreach my $object (@{$self->{invalidobjects}->{invalid_objects_list}}, @{$self->{invalidobjects}->{invalid_indexes_list}}, @{$self->{invalidobjects}->{invalid_registry_components_list}}, @{$self->{invalidobjects}->{invalid_ind_partitions_list}}) {
+          printf "%-20s%s", $object->[0], $object->[1];
+          printf "\n";
+        }
+        printf "ASCII_NOTIFICATION_END\n-->\n";
       }
     } elsif ($params{mode} =~ /server::database::stalestats/) {
       $self->add_nagios(

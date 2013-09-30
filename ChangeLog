@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8.3 - 2013-09-30
+- show detailed output for mode invalid-objects and report html
+
 1.8.2.1 - 2013-
 - bugfix in --name :...
 

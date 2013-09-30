@@ -681,7 +681,7 @@ $nagios_message = $server->{nagios_message};
 $nagios_level = $server->{nagios_level};
 $perfdata = $server->{perfdata};
 
-printf "%s - %s", $ERRORCODES{$nagios_level}, $nagios_message;
+printf "%s - %s", $ERRORCODES{$nagios_level}, $nagios_message if ! exists $server->{nagios}->{nomessages}->{$nagios_level};
 printf " | %s", $perfdata if $perfdata;
 printf "\n";
 exit $nagios_level;

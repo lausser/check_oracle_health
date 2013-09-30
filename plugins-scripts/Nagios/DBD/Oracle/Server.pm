@@ -310,6 +310,7 @@ sub init_nagios {
         2 => [],
         3 => [],
       },
+      nomessages => {},
       perfdata => [],
     };
     $$nagioslevelvar = $ERRORS{OK},
@@ -321,6 +322,7 @@ sub init_nagios {
         2 => [],
         3 => [],
       },
+      nomessages => {},
       perfdata => [],
     };
     $self->{nagios_level} = $ERRORS{OK},
@@ -398,6 +400,12 @@ sub add_nagios {
   }
 }
 
+sub supress_nagios {
+  my $self = shift;
+  my $level = shift;
+  $self->{nagios}->{nomessages}->{$level} = 1;
+}
+
 sub add_nagios_ok {
   my $self = shift;
   my $message = shift;
@@ -434,6 +442,9 @@ sub merge_nagios {
   foreach my $level (0..3) {
     foreach (@{$child->{nagios}->{messages}->{$level}}) {
       $self->add_nagios($level, $_);
+      if (exists $child->{nagios}->{nomessages}->{$level}) {
+        $self->{nagios}->{nomessages}->{$level} = 1;
+      }
     }
     #push(@{$self->{nagios}->{messages}->{$level}},
     #    @{$child->{nagios}->{messages}->{$level}});
