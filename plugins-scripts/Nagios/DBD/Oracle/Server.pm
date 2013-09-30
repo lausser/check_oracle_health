@@ -255,15 +255,24 @@ sub nagios {
           }
         }
       } else {
+        my $label = $params{name2};
+        my $showvalue = 1;
+        if (substr($label, 0, 1) eq ":") {
+          # --name "select status from backup" --name2 ":backup status"
+          # sometimes the numerical returncode is not relevant
+          $label = substr($label, 1);
+          $showvalue = 0;
+        }
         $self->add_nagios(
             # the first item in the list will trigger the threshold values
             $self->check_thresholds($self->{genericsql}[0], 1, 5),
-                sprintf "%s: %s%s",
-                $params{name2} ? lc $params{name2} : lc $params{selectname},
+                sprintf "%s%s %s%s",
+                $label ? lc $label : lc $params{selectname},
+                $showvalue ? ":" : "",
                 # float as float, integers as integers
-                join(" ", map {
+                $showvalue ? join(" ", map {
                     (sprintf("%d", $_) eq $_) ? $_ : sprintf("%f", $_)
-                } @{$self->{genericsql}}),
+                } @{$self->{genericsql}}) : "",
                 $params{units} ? $params{units} : "");
         my $i = 0;
         # workaround... getting the column names from the database would be nicer
@@ -1233,7 +1242,7 @@ sub init {
     }
   } else {
     if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)/) {
+        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)(:(\d+))*(\/([\w\-\._]+))*/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
       $self->{username} = $1;
@@ -1243,7 +1252,14 @@ sub init {
         delete $ENV{TWO_TASK};
         $self->{loginstring} = "sys";
       } else {
-        $self->{loginstring} = "traditional";
+        if ($7) {
+          $self->{dbhost} = $3;
+          $self->{dbport} = $5 || 1521;
+          $self->{dbservice} = $7;
+          $self->{loginstring} = "easyconnect";
+        } else {
+          $self->{loginstring} = "traditional";
+        }
       }
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
         $self->{connect} =~ /sysdba@([\w\-\._]+)/) {
@@ -1405,6 +1421,11 @@ sub init {
           $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
+              $self->{sql_commandfile}, $self->{sql_outfile};
+        } elsif ($self->{loginstring} eq "easyconnect") {
+          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s:%d/%s\" < %s > %s",
+              $sqlplus,
+              $self->{username}, $self->{password}, $self->{dbhost}, $self->{dbport}, $self->{dbservice},
               $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "extauth") {
           $self->{sqlplus} = sprintf "%s -S / < %s > %s",
