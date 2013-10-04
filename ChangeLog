@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8.4 - 2013-10-04
+- invalid-objects can be selected with --name/name2
+
 1.8.3 - 2013-09-30
 - show detailed output for mode invalid-objects and report html
 

@@ -108,7 +108,6 @@ sub init_invalid_objects {
           AND
             O.object_name NOT LIKE 'BIN$%'
       }, ($params{lookback} || 2));
-  $self->{invalidobjects}->{invalid_objects} = scalar(@{$self->{invalidobjects}->{invalid_objects_list}});
   # should be only N/A or VALID
   @{$self->{invalidobjects}->{invalid_indexes_list}} =
       $self->{handle}->fetchall_array(q{
@@ -116,7 +115,6 @@ sub init_invalid_objects {
           FROM dba_indexes
           WHERE status <> 'VALID' AND status <> 'N/A'
       });
-  $self->{invalidobjects}->{invalid_indexes} = scalar(@{$self->{invalidobjects}->{invalid_indexes_list}});
   # should be only USABLE
   @{$self->{invalidobjects}->{invalid_ind_partitions_list}} =
       $self->{handle}->fetchall_array(q{
@@ -124,7 +122,6 @@ sub init_invalid_objects {
           FROM dba_ind_partitions
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
-  $self->{invalidobjects}->{invalid_ind_partitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_partitions_list}});
   # should be only VALID
   @{$self->{invalidobjects}->{invalid_registry_components_list}} =
       $self->{handle}->fetchall_array(q{
@@ -132,14 +129,36 @@ sub init_invalid_objects {
           FROM dba_registry
           WHERE status <> 'VALID'
       });
-  $self->{invalidobjects}->{invalid_registry_components} = scalar(@{$self->{invalidobjects}->{invalid_registry_components_list}});
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
       ! defined $self->{invalidobjects}->{invalid_indexes} ||
       ! defined $self->{invalidobjects}->{invalid_registry_components} ||
       ! defined $self->{invalidobjects}->{invalid_ind_partitions}) {
-    $self->add_nagios_critical("unable to get invalid objects");
-    return undef;
+    #$self->add_nagios_critical("unable to get invalid objects");
+    #return undef;
   }
+  foreach my $cat (qw(invalid_objects_list invalid_indexes_list invalid_ind_partitions_list invalid_registry_components_list)) {
+    my @tmp_list = ();
+    foreach my $element (@{$self->{invalidobjects}->{$cat}}) {
+      next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
+      my $name = $element->[1];
+      if ($params{regexp}) {
+        if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
+          my $selectname = substr($params{selectname}, 1);
+          next if $name =~ /$selectname/;
+        } else {
+          next if $params{selectname} && $name !~ /$params{selectname}/i;
+        }
+      } else {
+        next if $params{selectname} && (lc $params{selectname} ne lc $name);
+      }
+      push(@tmp_list, $element);
+    }
+    @{$self->{invalidobjects}->{$cat}} = @tmp_list;
+  }
+  $self->{invalidobjects}->{invalid_objects} = scalar(@{$self->{invalidobjects}->{invalid_objects_list}});
+  $self->{invalidobjects}->{invalid_indexes} = scalar(@{$self->{invalidobjects}->{invalid_indexes_list}});
+  $self->{invalidobjects}->{invalid_ind_partitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_partitions_list}});
+  $self->{invalidobjects}->{invalid_registry_components} = scalar(@{$self->{invalidobjects}->{invalid_registry_components_list}});
 }
 
 sub init_stale_objects {
