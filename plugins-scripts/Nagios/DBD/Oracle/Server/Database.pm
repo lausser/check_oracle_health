@@ -267,8 +267,20 @@ $self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "ht
         $message = "OK - no invalid objects found";
 $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
       }
-      foreach (grep !/_list$/, sort keys %{$self->{invalidobjects}}) {
-        $self->add_perfdata(sprintf "%s=%d", $_, $self->{invalidobjects}->{$_});
+      # invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list
+      # dba_objects dba_indexes dba_ind_partitions dba_registry
+      if ($params{name2}) {
+        my $category = {
+            'dba_objects' => 'invalid_objects_list',
+            'dba_indexes' => 'invalid_indexes_list',
+            'dba_ind_partitions' => 'invalid_ind_partitions_list',
+            'dba_registry' => 'invalid_registry_components_list',
+        }->{$params{name2}};
+        $self->add_perfdata(sprintf "%s=%d", $category, $self->{invalidobjects}->{$category});
+      } else {
+        foreach (grep !/_list$/, sort keys %{$self->{invalidobjects}}) {
+          $self->add_perfdata(sprintf "%s=%d", $_, $self->{invalidobjects}->{$_});
+        }
       }
       if ($self->{nagios_level} && $params{report} eq "html") {
         require List::Util;
