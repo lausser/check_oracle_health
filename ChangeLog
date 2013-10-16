@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.8.4.3 - 2013-10-16
+- bugfix in sqlplus fetchrow_array, handles empty result set
+
 1.8.4.2 - 2013-10-16
 - bugfix in invalid objects for oracle < 10.x
 

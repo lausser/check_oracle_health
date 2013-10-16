@@ -1561,10 +1561,19 @@ sub fetchrow_array {
       $self->{errstr} = join(" ", @oerrs);
     } else {
       if ($output) {
+        my $stderrvar;
+        *SAVEERR = *STDERR;
+        open OUT ,'>',\$stderrvar;
+        *STDERR = *OUT;
         @row = map { convert($_) }
             map { s/^\s+([\.\d]+)$/$1/g; $_ }         # strip leading space from numbers
             map { s/\s+$//g; $_ }                     # strip trailing space
             split(/\|/, (split(/\n/, $output))[0]);
+        *STDERR = *SAVEERR;
+        if ($stderrvar) {
+          $self->trace(sprintf "something bad happened: %s", $stderrvar);
+          $self->{errstr} = $stderrvar;
+        }
       }
     }
   }
