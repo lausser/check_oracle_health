@@ -123,12 +123,21 @@ sub init_invalid_objects {
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
   # should be only VALID
-  @{$self->{invalidobjects}->{invalid_registry_components_list}} =
-      $self->{handle}->fetchall_array(q{
-          SELECT 'dba_registry', namespace||'.'||comp_name||'-'||version||' is '||status
-          FROM dba_registry
-          WHERE status <> 'VALID'
-      });
+  if ($self->version_is_minimum("10.x")) {
+    @{$self->{invalidobjects}->{invalid_registry_components_list}} =
+        $self->{handle}->fetchall_array(q{
+            SELECT 'dba_registry', namespace||'.'||comp_name||'-'||version||' is '||status
+            FROM dba_registry
+            WHERE status <> 'VALID'
+        });
+  } else {
+    @{$self->{invalidobjects}->{invalid_registry_components_list}} =
+        $self->{handle}->fetchall_array(q{
+            SELECT 'dba_registry', 'SCHEMA.'||comp_name||'-'||version||' is '||status
+            FROM dba_registry
+            WHERE status <> 'VALID'
+        });
+  }
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
       ! defined $self->{invalidobjects}->{invalid_indexes} ||
       ! defined $self->{invalidobjects}->{invalid_registry_components} ||
