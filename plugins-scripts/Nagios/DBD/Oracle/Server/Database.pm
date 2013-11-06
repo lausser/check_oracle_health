@@ -215,6 +215,43 @@ sub init_corrupted_blocks {
     $self->add_nagios_critical("unable to get corrupted blocks");
     return undef;
   }
+  @{$self->{corruptedobjects}} = $self->{handle}->fetchall_array(q{
+      WITH mytable AS (
+          SELECT
+              dbe.owner db_owner,
+              dbe.segment_name obj_name,
+              dbe.partition_name part_name,
+              dbe.segment_type typ,
+              dbe.tablespace_name ts_name,
+              vdbc.corruption_type
+          FROM
+              dba_extents dbe,
+              v$database_block_corruption vdbc
+          WHERE 1=1
+          AND dbe.file_id = vdbc.file#
+          AND vdbc.block# BETWEEN dbe.block_id AND dbe.block_id+dbe.blocks-1
+      )
+      SELECT DISTINCT
+          typ||' '||db_owner||'.'||obj_name||' is '||corruption_type||' corrupt'
+      FROM mytable
+  });
+  foreach my $element (@{$self->{corruptedobjects}}) {
+    next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
+    my $name = $element->[1];
+    if ($params{regexp}) {
+      if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
+        my $selectname = substr($params{selectname}, 1);
+        next if $name =~ /$selectname/;
+      } else {
+        next if $params{selectname} && $name !~ /$params{selectname}/i;
+      }
+    } else {
+      next if $params{selectname} && (lc $params{selectname} ne lc $name);
+    }
+    push(@tmp_list, $element);
+  }
+  @{$self->{invalidobjects}->{$cat}} = @tmp_list;
+
 }
 
 sub nagios {

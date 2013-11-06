@@ -68,7 +68,8 @@ sub new {
       # much more cheaper.
       $self->{version} = $self->{handle}->fetchrow_array(
           q{ SELECT version FROM product_component_version 
-               WHERE product LIKE '%Server%' });
+               WHERE product LIKE '%Server%' OR
+                     product LIKE 'Oracle Database%Enterprise Edition%' });
       $self->{os} = 'Unix';
       $self->{dbuser} = $self->{username};
       $self->{thread} = 1;
@@ -1534,6 +1535,7 @@ sub fetchrow_array {
       $sql =~ s/\?/'$_'/;
     }
   }
+  $sql =~ s/^\s*//g;
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
@@ -1607,7 +1609,7 @@ sub fetchall_array {
       $sql =~ s/\?/'$_'/;
     }
   }
-
+  $sql =~ s/^\s*//g;
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
