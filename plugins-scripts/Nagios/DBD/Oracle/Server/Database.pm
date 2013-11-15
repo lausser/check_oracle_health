@@ -235,22 +235,23 @@ sub init_corrupted_blocks {
           typ||' '||db_owner||'.'||obj_name||' is '||corruption_type||' corrupt'
       FROM mytable
   });
-  foreach my $element (@{$self->{corruptedobjects}}) {
-    next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
-    my $name = $element->[1];
-    if ($params{regexp}) {
-      if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
-        my $selectname = substr($params{selectname}, 1);
-        next if $name =~ /$selectname/;
-      } else {
-        next if $params{selectname} && $name !~ /$params{selectname}/i;
-      }
-    } else {
-      next if $params{selectname} && (lc $params{selectname} ne lc $name);
-    }
-    push(@tmp_list, $element);
-  }
-  @{$self->{invalidobjects}->{$cat}} = @tmp_list;
+#printf "%s\n", Data::Dumper::Dumper($self->{corruptedobjects});
+#  foreach my $element (@{$self->{corruptedobjects}}) {
+#    next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
+#    my $name = $element->[1];
+#    if ($params{regexp}) {
+#      if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
+#        my $selectname = substr($params{selectname}, 1);
+#        next if $name =~ /$selectname/;
+#      } else {
+#        next if $params{selectname} && $name !~ /$params{selectname}/i;
+#      }
+#    } else {
+#      next if $params{selectname} && (lc $params{selectname} ne lc $name);
+#    }
+#    push(@tmp_list, $element);
+#  }
+#  @{$self->{invalidobjects}->{$cat}} = @tmp_list;
 
 }
 

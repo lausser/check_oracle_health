@@ -626,6 +626,16 @@ sub dbconnect {
     $retval = $self->{handle};
   }
   $self->{tac} = Time::HiRes::time();
+  # the Connection-object had it's own signal handler. Restore the old one
+  # and set a new timeout
+  if ($^O =~ /MSWin/) {
+    # has been localized, no restore necessary
+  } else {
+    use POSIX ':signal_h';
+    my $mask = POSIX::SigSet->new(SIGALRM);
+    POSIX::sigaction(SIGALRM, $self->{handle}->{old_action});
+  }
+  alarm($self->{timeout} - ($self->{tac} - $self->{tic}));
   return $retval;
 }
 
@@ -985,7 +995,7 @@ sub init {
       use POSIX ':signal_h';
       if ($^O =~ /MSWin/) {
         local $SIG{'ALRM'} = sub {
-          die "alarm\n";
+          die "timeout alarm\n";
         };
       } else {
         POSIX::setpgid(0, 0);
@@ -993,12 +1003,7 @@ sub init {
         my $term_mask = POSIX::SigSet->new(SIGTERM);
         my $alrm_action = POSIX::SigAction->new(
             sub {
-                if (1) {
-                  printf "CRITICAL - timeout\n";
-                  kill 9, 0;
-                } else {
-                  die "timeout alarm\n" ;
-                }
+                die "timeout alarm\n";
             }, $alrm_mask);
         my $term_action = POSIX::SigAction->new(
             sub {
@@ -1009,9 +1014,9 @@ sub init {
                   die "sigterm\n" ;      
                 }
             }, $term_mask);
-        my $old_action = POSIX::SigAction->new();
-        POSIX::sigaction(SIGALRM, $alrm_action, $old_action);
-        POSIX::sigaction(SIGTERM, $term_action, $old_action);
+        $self->{old_action} = POSIX::SigAction->new();
+        POSIX::sigaction(SIGALRM, $alrm_action, $self->{old_action});
+        POSIX::sigaction(SIGTERM, $term_action);
       }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
@@ -1231,6 +1236,21 @@ sub init {
       }
     }
   }
+  use POSIX ':signal_h';
+  if ($^O =~ /MSWin/) {
+    local $SIG{'ALRM'} = sub {
+      die "timeout alarm\n";
+    };
+  } else {
+    my $mask = POSIX::SigSet->new(SIGALRM);
+    my $action = POSIX::SigAction->new(
+        sub { die "timeout alarm\n" ; }, $mask);
+    my $old_action = POSIX::SigAction->new();
+    $self->{old_action} = $old_action;
+    sigaction(SIGALRM, $action, $old_action);
+  }
+  alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
+  
   eval {
     my ($tempfile_handle, $tempfile) =
         tempfile($template, SUFFIX => ".temp", UNLINK => 1,
@@ -1460,20 +1480,6 @@ sub init {
         }
       }
   
-      use POSIX ':signal_h';
-      if ($^O =~ /MSWin/) {
-        local $SIG{'ALRM'} = sub {
-          die "alarm\n";
-        };
-      } else {
-        my $mask = POSIX::SigSet->new( SIGALRM );
-        my $action = POSIX::SigAction->new(
-            sub { die "alarm\n" ; }, $mask);
-        my $oldaction = POSIX::SigAction->new();
-        sigaction(SIGALRM ,$action ,$oldaction );
-      }
-      alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
-  
       if ($self->{mode} =~ /^server::tnsping/) {
         if ($tnsping) {
           my $exit_output = `$tnsping $self->{sid}`;
@@ -1683,6 +1689,20 @@ sub execute {
 sub DESTROY {
   my $self = shift;
   $self->trace("try to clean up command and result files");
+  if ($^O =~ /linux/) {
+    my $pgrp = getpgrp();
+    open(KILL, "/bin/ps -o pid,pgid,cmd --no-headers|");
+    while (<KILL>) {
+      if (/^(\d+)\s+(\d+).*sqlplus.*/) {
+        if ($2 == $$ && $1 != $$) {
+          kill 15, $1;
+        }
+        #printf "kill 9, %d\n", $1 if $2 == $$ && $1 != $$;
+        #kill 9, $1 if $2 == $$ && $1 != $$;
+      }
+    }
+    close KILL;
+  }
   unlink $self->{sql_commandfile}
       if $self->{sql_commandfile} && -f $self->{sql_commandfile};
   unlink $self->{sql_resultfile}
@@ -1776,14 +1796,15 @@ sub init {
       use POSIX ':signal_h';
       if ($^O =~ /MSWin/) {
         local $SIG{'ALRM'} = sub {
-          die "alarm\n";
+          die "timeout alarm\n";
         };
       } else {
-        my $mask = POSIX::SigSet->new( SIGALRM );
+        my $mask = POSIX::SigSet->new(SIGALRM);
         my $action = POSIX::SigAction->new(
-            sub { die "alarm\n" ; }, $mask);
-        my $oldaction = POSIX::SigAction->new();
-        sigaction(SIGALRM ,$action ,$oldaction );
+            sub { die "timeout alarm\n" ; }, $mask);
+        my $old_action = POSIX::SigAction->new();
+        $self->{old_action} = $old_action;
+        sigaction(SIGALRM, $action, $old_action);
       }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       if ($self->{handle} = DBI->connect(

@@ -597,10 +597,34 @@ if (exists $commandline{name}) {
   } 
 }
 
-$SIG{'ALRM'} = sub {
-  printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
-  exit $ERRORS{UNKNOWN};
-};
+my $now = time;
+#$SIG{'ALRM'} = sub {
+#  printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
+#  exit $ERRORS{UNKNOWN};
+#};
+use POSIX ':signal_h';
+if ($^O =~ /MSWin/) {
+  local $SIG{'ALRM'} = sub {
+    printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
+    exit $ERRORS{UNKNOWN};
+  };
+} else {
+  my $mask = POSIX::SigSet->new(SIGALRM);
+  my $action = POSIX::SigAction->new(
+    sub { 
+      printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
+      #if ($^O =~ /linux/) {
+      #  open(KILL, "/bin/ps -o pid --no-headers --ppid $$|");
+      #  while (<KILL>) {
+      #    printf "kill %s\n", $_;
+      #  }
+      #  close KILL;
+      #}
+      exit $ERRORS{UNKNOWN};
+    }, $mask);
+  my $old_action = POSIX::SigAction->new();
+  sigaction(SIGALRM, $action, $old_action);
+}
 alarm($TIMEOUT);
 
 my $nagios_level = $ERRORS{UNKNOWN};
