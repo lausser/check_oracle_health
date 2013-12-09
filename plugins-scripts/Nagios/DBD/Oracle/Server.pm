@@ -1223,6 +1223,9 @@ sub init {
   my $retval = undef;
   $self->{loginstring} = "traditional";
   my $template = $self->{mode}.'XXXXX';
+  if ($^O =~ /MSWin/) {
+    $template =~ s/:/_/g; # mode contains ":", which is not good in windows path names
+  }
   my $now = time;
   if (1) {
     # Maybe we have crap files for whatever reason.

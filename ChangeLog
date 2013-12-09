@@ -2,8 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
-1.9 - 2013-11-15
+1.9 - 2013-12-09
 - rewrite of the timeout handling
+- bugfix for the windows version
 
 1.8.4.3 - 2013-10-16
 - bugfix in sqlplus fetchrow_array, handles empty result set
