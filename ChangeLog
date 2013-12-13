@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.1 - 2013-12-13
+- bugfix in tablespace-free (datafile in status recovery leads to undef error)
+
 1.9 - 2013-12-09
 - rewrite of the timeout handling
 - bugfix for the windows version

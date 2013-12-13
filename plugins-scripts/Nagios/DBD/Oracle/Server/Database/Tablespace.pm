@@ -388,7 +388,9 @@ sub init {
   $self->init_nagios();
   $self->set_local_db_thresholds(%params);
   if ($params{mode} =~ /server::database::tablespace::(usage|free)/) {
-    if (! defined $self->{bytes_max}) {
+    if (! defined $self->{bytes_max} || $self->{bytes_max} eq '') { 
+      # eq '' kommt z.b. vor, wenn ein datafile online_status recover hat
+      in dba_data_files sind dann bytes und maxbytes nicht belegt (Null)
       $self->{bytes} = 0;
       $self->{bytes_max} = 0;
       $self->{bytes_free} = 0;
@@ -585,15 +587,6 @@ sub nagios {
             $self->add_nagios(
                 defined $params{mitigation} ? $params{mitigation} : 2,
                 sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
-            );
-          }
-          if ($self->{status} eq 'offline') {
-            $self->add_nagios_warning(
-                sprintf("tbs %s is offline", $self->{name})
-            );
-          } else {
-            $self->add_nagios_critical(
-                sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name}) 
             );
           }
         } else {
