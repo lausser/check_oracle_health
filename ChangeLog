@@ -2,6 +2,12 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.2 - 2013-12-18
+- show detailed output for mode corrupted-blocks and report html
+
+1.9.1.1 - 2013-12-17
+- bugfix in connection destructor
+
 1.9.1 - 2013-12-13
 - bugfix in tablespace-free (datafile in status recovery leads to undef error)
 

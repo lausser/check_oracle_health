@@ -208,51 +208,115 @@ sub init_stale_objects {
 sub init_corrupted_blocks {
   my $self = shift;
   my %params = @_;
-  $self->{corruptedblocks} = $self->{handle}->fetchrow_array(q{
+  $self->{numcorruptedblocks} = $self->{handle}->fetchrow_array(q{
       SELECT COUNT(*) FROM v$database_block_corruption
   });
-  if (! defined $self->{corruptedblocks}) {
+  if (! defined $self->{numcorruptedblocks}) {
     $self->add_nagios_critical("unable to get corrupted blocks");
     return undef;
   }
-  @{$self->{corruptedobjects}} = $self->{handle}->fetchall_array(q{
+  @{$self->{corruptedobjects}->{extents_list}} =
+      $self->{handle}->fetchall_array(q{
       WITH mytable AS (
-          SELECT
-              dbe.owner db_owner,
-              dbe.segment_name obj_name,
-              dbe.partition_name part_name,
-              dbe.segment_type typ,
-              dbe.tablespace_name ts_name,
-              vdbc.corruption_type
-          FROM
-              dba_extents dbe,
-              v$database_block_corruption vdbc
-          WHERE 1=1
-          AND dbe.file_id = vdbc.file#
-          AND vdbc.block# BETWEEN dbe.block_id AND dbe.block_id+dbe.blocks-1
+      SELECT
+          dbe.owner db_owner,
+          dbe.segment_name obj_name,
+          dbe.partition_name part_name,
+          dbe.segment_type typ,
+          vdbc.corruption_type corruption_type,
+          vdbc.file# file_number,
+          vdbc.block# block_number,
+          GREATEST(dbe.block_id, vdbc.block#) corr_start_block,
+          LEAST(dbe.block_id+dbe.blocks-1, vdbc.block#+vdbc.blocks-1) corr_end_block,
+          LEAST(dbe.block_id+dbe.blocks-1, vdbc.block#+vdbc.blocks-1) - GREATEST(dbe.block_id, vdbc.block#) + 1 blocks_corrupted,
+          'dba_extents' description
+      FROM
+          dba_extents dbe,
+          v$database_block_corruption vdbc
+      WHERE 1=1
+      AND dbe.file_id = vdbc.file#
+      AND dbe.block_id <= vdbc.block# + vdbc.blocks - 1
+      AND dbe.block_id + dbe.blocks - 1 >= vdbc.block#
       )
-      SELECT DISTINCT
-          typ||' '||db_owner||'.'||obj_name||' is '||corruption_type||' corrupt'
+      SELECT
+         description, db_owner||'.'||obj_name||' is '||corruption_type||' corrupted'
       FROM mytable
   });
-#printf "%s\n", Data::Dumper::Dumper($self->{corruptedobjects});
-#  foreach my $element (@{$self->{corruptedobjects}}) {
-#    next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
-#    my $name = $element->[1];
-#    if ($params{regexp}) {
-#      if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
-#        my $selectname = substr($params{selectname}, 1);
-#        next if $name =~ /$selectname/;
-#      } else {
-#        next if $params{selectname} && $name !~ /$params{selectname}/i;
-#      }
-#    } else {
-#      next if $params{selectname} && (lc $params{selectname} ne lc $name);
-#    }
-#    push(@tmp_list, $element);
-#  }
-#  @{$self->{invalidobjects}->{$cat}} = @tmp_list;
-
+  @{$self->{corruptedobjects}->{segments_list}} =
+      $self->{handle}->fetchall_array(q{
+      WITH mytable AS (
+          SELECT
+              dbs.owner db_owner,
+              dbs.segment_name obj_name,
+              dbs.partition_name part_name,
+              dbs.segment_type typ,
+              vdbc.corruption_type corruption_type,
+              vdbc.file# file_number,
+              vdbc.block# block_number,
+              dbs.header_block corr_start_block,
+              dbs.header_block corr_end_block,
+              1 blocks_corrupted,
+              'dba_segments' description
+          FROM
+              dba_segments dbs,
+              v$database_block_corruption vdbc
+          WHERE 1=1
+          AND dbs.header_file = vdbc.file#
+          AND dbs.header_block BETWEEN vdbc.block# AND vdbc.block#+vdbc.blocks-1
+      )
+      SELECT
+         description, db_owner||'.'||obj_name||' is '||corruption_type||' corrupted'
+      FROM mytable
+  });
+  @{$self->{corruptedobjects}->{free_list}} =
+      $self->{handle}->fetchall_array(q{
+      WITH mytable AS (
+          SELECT
+              'SYS' db_owner,
+              'file'||vdbc.file#||'block'||vdbc.block# obj_name,
+              'noname' part_name,
+              'free' typ,
+              vdbc.corruption_type corruption_type,
+              vdbc.file# file_number,
+              vdbc.block# block_number,
+              GREATEST(dbf.block_id, vdbc.block#) corr_start_block,
+              LEAST(dbf.block_id+dbf.blocks-1, vdbc.block#+vdbc.blocks-1) corr_end_block,
+              LEAST(dbf.block_id+dbf.blocks-1, vdbc.block#+vdbc.blocks-1) - GREATEST(dbf.block_id, vdbc.block#) + 1 blocks_corrupted,
+              'dba_free_space' description
+          FROM
+              dba_free_space dbf,
+              v$database_block_corruption vdbc
+          WHERE 1=1
+          AND dbf.file_id = vdbc.file#
+          AND dbf.block_id <= vdbc.block# + vdbc.blocks -1
+          AND dbf.block_id + dbf.blocks - 1 >= vdbc.block#
+      )
+      SELECT
+         description, db_owner||'.'||obj_name||' is '||corruption_type||' corrupted'
+      FROM mytable
+  });
+  foreach my $cat (qw(extents_list segments_list free_list)) {
+    my @tmp_list = ();
+    foreach my $element (@{$self->{corruptedobjects}->{$cat}}) {
+      next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
+      my $name = $element->[1];
+      if ($params{regexp}) {
+        if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
+          my $selectname = substr($params{selectname}, 1);
+          next if $name =~ /$selectname/;
+        } else {
+          next if $params{selectname} && $name !~ /$params{selectname}/i;
+        }
+      } else {
+        next if $params{selectname} && (lc $params{selectname} ne lc $name);
+      }
+      push(@tmp_list, $element);
+    }
+    @{$self->{corruptedobjects}->{$cat}} = @tmp_list;
+  }
+  $self->{corruptedobjects}->{extents} = scalar(@{$self->{corruptedobjects}->{extents_list}});
+  $self->{corruptedobjects}->{segments} = scalar(@{$self->{corruptedobjects}->{segments_list}});
+  $self->{corruptedobjects}->{free} = scalar(@{$self->{corruptedobjects}->{free_list}});
 }
 
 sub nagios {
@@ -308,11 +372,11 @@ sub nagios {
             $self->{invalidobjects}->{invalid_ind_partitions}, 0.1, 0.1);
         $self->add_nagios($level, join(", ", @message));
         $message = $ERRORCODES{$level}.' - '.join(", ", @message);
-$self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
+        $self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
       } else {
         $self->add_nagios_ok("no invalid objects found");
         $message = "OK - no invalid objects found";
-$self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
+        $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
       }
       # invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list
       # dba_objects dba_indexes dba_ind_partitions dba_registry
@@ -338,7 +402,6 @@ $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
         foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
           $invalid_lines += scalar(@{$self->{invalidobjects}->{$list}});
           $linespercategory->{$list} = 0;
-    #scalar(@{$self->{invalidobjects}->{$list}});
         }
         my $output_lines = List::Util::sum(values %{$linespercategory});
         my $full = 0;
@@ -394,12 +457,96 @@ $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
           $self->{staleobjects},
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ /server::database::blockcorruption/) {
-      $self->add_nagios(
-          $self->check_thresholds($self->{corruptedblocks}, "1", "10"),
-          sprintf "%d database blocks are corrupted", $self->{corruptedblocks});
-      $self->add_perfdata(sprintf "corrupted_blocks=%d;%s;%s",
-          $self->{corruptedblocks},
-          $self->{warningrange}, $self->{criticalrange});
+      #$self->add_nagios(
+      #    $self->check_thresholds($self->{corruptedblocks}, "1", "10"),
+      #    sprintf "%d database blocks are corrupted", $self->{corruptedblocks});
+      #$self->add_perfdata(sprintf "corrupted_blocks=%d;%s;%s",
+      #    $self->{corruptedblocks},
+      #    $self->{warningrange}, $self->{criticalrange});
+      my @message = ();
+      my $message = undef;
+      my $level = undef;
+      push(@message, sprintf "%d corrupt extents",
+          $self->{corruptedobjects}->{extents}) if
+          $self->{corruptedobjects}->{extents};
+      push(@message, sprintf "%d corrupt segment headers",
+          $self->{corruptedobjects}->{segments}) if
+          $self->{corruptedobjects}->{segments};
+      push(@message, sprintf "%d corrupt free blocks",
+          $self->{corruptedobjects}->{free}) if
+          $self->{corruptedobjects}->{free};
+      if (scalar(@message)) {
+        my $level = $self->check_thresholds(
+            $self->{corruptedobjects}->{extents} +
+            $self->{corruptedobjects}->{segments} +
+            $self->{corruptedobjects}->{free}, 0.1, 0.1);
+        $self->add_nagios($level, join(", ", @message));
+        $message = $ERRORCODES{$level}.' - '.join(", ", @message);
+        $self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
+      } else {
+        $self->add_nagios_ok("no corrupt blocks found");
+        $message = "OK - no corrupt blocks found";
+        $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
+      }
+      foreach (grep !/_list$/, sort keys %{$self->{corruptedobjects}}) {
+        $self->add_perfdata(sprintf "%s=%d", $_, $self->{corruptedobjects}->{$_});
+      }
+      if ($self->{nagios_level} && $params{report} eq "html") {
+        require List::Util;
+        my $maxlines = 10;
+        my $invalid_lines = 0;
+        my $linespercategory = {};
+
+        foreach my $list (qw(extents_list segments_list free_list)) {
+          $invalid_lines += scalar(@{$self->{corruptedobjects}->{$list}});
+          $linespercategory->{$list} = 0;
+        }
+        my $output_lines = List::Util::sum(values %{$linespercategory});
+        my $full = 0;
+        do {
+          foreach my $list (qw(extents_list segments_list free_list)) {
+            $linespercategory->{$list}++ if scalar(@{$self->{corruptedobjects}->{$list}}) > $linespercategory->{$list};
+            $output_lines = List::Util::sum(values %{$linespercategory});
+            $full = 1 if ($output_lines >= $maxlines || $output_lines >= $invalid_lines);
+            last if $full;
+          }
+        } while (! $full);
+        printf "%s\n", $message;
+        printf "<table style=\"border-collapse:collapse; border: 1px solid black;\">";
+        foreach my $list (qw(extents_list segments_list free_list)) {
+          if ($linespercategory->{$list}) {
+        printf "<tr>";
+        foreach (qw(Table Object)) {
+          printf "<th style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</th>", $_;
+        }
+        printf "</tr>";
+            foreach my $object (@{$self->{corruptedobjects}->{$list}}[0..$linespercategory->{$list} - 1]) {
+
+              printf "<tr>";
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</td>", $object->[0];
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px; white-space: nowrap\">%s</td>", $object->[1];
+              printf "</tr>";
+            }
+            if ($linespercategory->{$list} < scalar(@{$self->{corruptedobjects}->{$list}})) {
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td colspan=\"2\" class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">... (%d more)</td>", scalar(@{$self->{corruptedobjects}->{$list}}) - $linespercategory->{$list};
+              printf "</tr>";
+            }
+          }
+        }
+        printf "</table>\n";
+        printf "<!--\nASCII_NOTIFICATION_START\n";
+        foreach (qw(Table Object)) {
+          printf "%-20s", $_;
+        }
+        printf "\n";
+        foreach my $object (@{$self->{corruptedobjects}->{extents_list}}, @{$self->{corruptedobjects}->{segments_list}}, @{$self->{corruptedobjects}->{free_list}}) {
+          printf "%-20s%s", $object->[0], $object->[1];
+          printf "\n";
+        }
+        printf "ASCII_NOTIFICATION_END\n-->\n";
+      }
     } elsif ($params{mode} =~ /server::database::datafilesexisting/) {
         my $datafile_usage = $self->{num_datafiles} / 
             $self->{num_datafiles_max} * 100;

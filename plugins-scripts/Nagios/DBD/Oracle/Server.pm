@@ -1691,6 +1691,7 @@ sub execute {
 
 sub DESTROY {
   my $self = shift;
+  my $plugin_exit = $?;
   $self->trace("try to clean up command and result files");
   if ($^O =~ /linux/) {
     my $pgrp = getpgrp();
@@ -1712,6 +1713,10 @@ sub DESTROY {
       if $self->{sql_resultfile} && -f $self->{sql_resultfile};
   unlink $self->{sql_outfile} if
       $self->{sql_outfile} && -f $self->{sql_outfile};
+  # der war fies. destruktor laeuft nach dem abschliessenden exit(nagios_exit)
+  # und das kill/ps-zeugs vermurkst den exitcode bzw setzt ihn immer auf 0
+  # kam zum vorschein bei my-modulen
+  $? = $plugin_exit;
 }
 
 sub create_commandfile {
