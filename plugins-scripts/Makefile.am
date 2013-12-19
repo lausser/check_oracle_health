@@ -26,6 +26,8 @@ EXTRA_MODULES=\
   Nagios/DBD/Oracle/Server/Database/Tablespace/Datafile.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace/Segment.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace.pm \
+  Nagios/DBD/Oracle/Server/Database/Asm/Diskgroup.pm \
+  Nagios/DBD/Oracle/Server/Database/Asm.pm \
   Nagios/DBD/Oracle/Server/Database.pm \
   Nagios/DBD/Oracle/Server.pm \
   Nagios/Extraopts.pm

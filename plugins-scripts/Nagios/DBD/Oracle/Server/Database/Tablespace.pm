@@ -390,7 +390,7 @@ sub init {
   if ($params{mode} =~ /server::database::tablespace::(usage|free)/) {
     if (! defined $self->{bytes_max} || $self->{bytes_max} eq '') { 
       # eq '' kommt z.b. vor, wenn ein datafile online_status recover hat
-      in dba_data_files sind dann bytes und maxbytes nicht belegt (Null)
+      # in dba_data_files sind dann bytes und maxbytes nicht belegt (Null)
       $self->{bytes} = 0;
       $self->{bytes_max} = 0;
       $self->{bytes_free} = 0;

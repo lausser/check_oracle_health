@@ -679,6 +679,43 @@ sub DESTROY {
   }
 }
 
+# $self->protect_value(\%params, 'cpu_busy', 'cpu_busy', 'percent');
+sub protect_value {
+  my $self = shift;
+  my $pparams = shift;
+  my %params = %{$pparams};
+  my $ident = shift;
+  my $key = shift;
+  my $validfunc = shift;
+  if (ref($validfunc) ne "CODE" && $validfunc eq "percent") {
+    $validfunc = sub {
+      my $value = shift;
+      return ($value < 0 || $value > 100) ? 0 : 1;
+    }
+  }
+  if (&$validfunc($self->{$key})) {
+    $self->save_state(%params, (name => 'protect_'.$ident.'_'.$key, save => {
+        $key => $self->{$key},
+        exception => 0,
+    }));
+  } else {
+    # if the device gives us an clearly wrong value, simply use the last value.
+    my $laststate = $self->load_state(%params, (name => 'protect_'.$ident.'_'.$key));
+    $self->debug(sprintf "self->{%s} is %s and invalid for the %dth time",
+        $key, $self->{$key}, $laststate->{exception} + 1);
+    if ($laststate->{exception} < 4) {
+      # but only 5 times.
+      # if the error persists, somebody has to check the device.
+      $self->{$key} = $laststate->{$key};
+    }
+    $laststate->{exception}++;
+    $self->save_state(%params, (name => 'protect_'.$ident.'_'.$key, save => {
+        $key => $self->{$key},
+        exception => $laststate->{exception},
+    }));
+  }
+}
+
 sub save_state {
   my $self = shift;
   my %params = @_;
@@ -1022,7 +1059,7 @@ sub init {
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
       my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
       my $username = $self->{username};
-      if ($self->{username} eq "sys" || $self->{username} eq "sysdba") {
+      if ($self->{username} eq "sys" || $self->{username} eq "sysdba" || $self->{username} eq "asmsnmp") {
         $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
               ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA
         $dsn = sprintf "DBI:Oracle:";

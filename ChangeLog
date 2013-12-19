@@ -4,6 +4,8 @@
 
 1.9.2 - 2013-12-18
 - show detailed output for mode corrupted-blocks and report html
+- protect sga-data-buffer-hit-ratio against non-plausible values
+- add modes list-asm-diskgroups and asm-diskgroup-usage/free (Thanks Oliver Skibbe!)
 
 1.9.1.1 - 2013-12-17
 - bugfix in connection destructor

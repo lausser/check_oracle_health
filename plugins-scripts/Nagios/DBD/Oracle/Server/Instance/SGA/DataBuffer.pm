@@ -52,6 +52,7 @@ sub init {
               $self->{delta_sum_physical_reads_direct_lob} -
               $self->{delta_sum_physical_reads_direct}) /
               $self->{delta_sum_session_logical_reads}) : 0;
+      $self->protect_value(\%params, 'hitratio', 'hitratio', 'percent');
     }
   }
 }

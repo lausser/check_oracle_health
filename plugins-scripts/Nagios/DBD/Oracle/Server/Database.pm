@@ -54,6 +54,8 @@ sub init {
     }
   } elsif ($params{mode} =~ /server::database::dataguard/) {
     $self->{dataguard} = DBD::Oracle::Server::Database::Dataguard->new(%params);
+  } elsif ($params{mode} =~ /server::database::asm/) {
+    $self->{asm} = DBD::Oracle::Server::Database::Asm->new(%params);
   } elsif ($params{mode} =~ /server::database::invalidobjects/) {
     $self->init_invalid_objects(%params);
   } elsif ($params{mode} =~ /server::database::stalestats/) {
@@ -348,6 +350,9 @@ sub nagios {
     } elsif ($params{mode} =~ /server::database::dataguard/) {
       $self->{dataguard}->nagios(%params);
       $self->merge_nagios($self->{dataguard});
+    } elsif ($params{mode} =~ /server::database::asm/) {
+      $self->{asm}->nagios(%params);
+      $self->merge_nagios($self->{asm});
     } elsif ($params{mode} =~ /server::database::invalidobjects/) {
       my @message = ();
       my $message = undef;
@@ -369,7 +374,7 @@ sub nagios {
             $self->{invalidobjects}->{invalid_objects} +
             $self->{invalidobjects}->{invalid_indexes} +
             $self->{invalidobjects}->{invalid_registry_components} +
-            $self->{invalidobjects}->{invalid_ind_partitions}, 0.1, 0.1);
+            $self->{invalidobjects}->{invalid_ind_partitions}, 0, 0);
         $self->add_nagios($level, join(", ", @message));
         $message = $ERRORCODES{$level}.' - '.join(", ", @message);
         $self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
