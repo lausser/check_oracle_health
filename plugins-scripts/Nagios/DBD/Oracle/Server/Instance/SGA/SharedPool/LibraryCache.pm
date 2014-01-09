@@ -90,9 +90,9 @@ sub nagios {
         /server::instance::sga::sharedpool::librarycache::pinhitratio/) {
       $self->add_nagios(
           $self->check_thresholds($self->{pin_hitratio}, "98:", "95:"),
-          sprintf "SGA library cache (pin) hit ratio %.2f%%", $self->{get_hitratio});
+          sprintf "SGA library cache (pin) hit ratio %.2f%%", $self->{pin_hitratio});
       $self->add_perfdata(sprintf "sga_library_cache_hit_ratio=%.2f%%;%s;%s",
-          $self->{get_hitratio}, $self->{warningrange}, $self->{criticalrange});
+          $self->{pin_hitratio}, $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ 
         /server::instance::sga::sharedpool::librarycache::reloads/) {
       $self->add_nagios(
