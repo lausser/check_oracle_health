@@ -465,7 +465,12 @@ sub nagios {
           printf "%-20s", $_;
         }
         printf "\n";
-        foreach my $object (@{$self->{invalidobjects}->{invalid_objects_list}}, @{$self->{invalidobjects}->{invalid_indexes_list}}, @{$self->{invalidobjects}->{invalid_registry_components_list}}, @{$self->{invalidobjects}->{invalid_ind_partitions_list}, @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}}) {
+        foreach my $object (
+            @{$self->{invalidobjects}->{invalid_objects_list}},
+            @{$self->{invalidobjects}->{invalid_indexes_list}},
+            @{$self->{invalidobjects}->{invalid_registry_components_list}},
+            @{$self->{invalidobjects}->{invalid_ind_partitions_list}},
+            @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}}) {
           printf "%-20s%s", $object->[0], $object->[1];
           printf "\n";
         }
