@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.3 - 2014-01-13
+- added subpartitions to invalid-objects
+
 1.9.2.1 - 2014-01-09
 - bugfix in sga-library-cache-pinhit-ratio (Thanks Michel van der Voort)
 

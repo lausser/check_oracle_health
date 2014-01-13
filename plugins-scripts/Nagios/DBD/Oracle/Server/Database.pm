@@ -90,6 +90,7 @@ sub init_invalid_objects {
   my $invalid_objects = undef;
   my $invalid_indexes = undef;
   my $invalid_ind_partitions = undef;
+  my $invalid_ind_subpartitions = undef;
   my $unrecoverable_datafiles = undef;
   @{$self->{invalidobjects}->{invalid_objects_list}} =
       $self->{handle}->fetchall_array(q{
@@ -124,6 +125,13 @@ sub init_invalid_objects {
           FROM dba_ind_partitions
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
+  # should be only USABLE
+  @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT 'dba_ind_subpartitions', subpartition_name||' of '||partition_name||' of '||index_owner||'.'||index_name||' is '||status
+          FROM dba_ind_partitions
+          WHERE status <> 'USABLE' AND status <> 'N/A'
+      });
   # should be only VALID
   if ($self->version_is_minimum("10.x")) {
     @{$self->{invalidobjects}->{invalid_registry_components_list}} =
@@ -143,16 +151,19 @@ sub init_invalid_objects {
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
       ! defined $self->{invalidobjects}->{invalid_indexes} ||
       ! defined $self->{invalidobjects}->{invalid_registry_components} ||
+      ! defined $self->{invalidobjects}->{invalid_ind_subpartitions} ||
       ! defined $self->{invalidobjects}->{invalid_ind_partitions}) {
     #$self->add_nagios_critical("unable to get invalid objects");
     #return undef;
   }
-  foreach my $cat (qw(invalid_objects_list invalid_indexes_list invalid_ind_partitions_list invalid_registry_components_list)) {
+  foreach my $cat (qw(invalid_objects_list invalid_indexes_list invalid_ind_partitions_list invalid_ind_subpartitions_list invalid_registry_components_list)) {
     my @tmp_list = ();
     foreach my $element (@{$self->{invalidobjects}->{$cat}}) {
       next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
       my $name = $element->[1];
       if ($params{regexp}) {
+        # can be used to pick system an application accounts
+        # --name 'of (SYS|SYSTEM|OUTLN|SCOTT|ADAMS|JONES|CLARK|BLAKE|WOOD|STEEL|CLOTH|PAPER|HR|OE|SH|OE|SH|DEMO|ANONYMOUS|%APEX%|AURORA\$ORB\$UNAUTHENTICATED|AWR_STAGE|CSMIG|CTXSYS|DBSNMP|DIP|DMSYS|DSSYS|EXFSYS|LBACSYS|MDSYS|ORACLE_OCM|ORDPLUGINS|ORDSYS|PERFSTAT|TRACESVR|TSMSYS|XDB|TSDSADM|APPQOSSYS)\.'
         if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
           my $selectname = substr($params{selectname}, 1);
           next if $name =~ /$selectname/;
@@ -169,6 +180,7 @@ sub init_invalid_objects {
   $self->{invalidobjects}->{invalid_objects} = scalar(@{$self->{invalidobjects}->{invalid_objects_list}});
   $self->{invalidobjects}->{invalid_indexes} = scalar(@{$self->{invalidobjects}->{invalid_indexes_list}});
   $self->{invalidobjects}->{invalid_ind_partitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_partitions_list}});
+  $self->{invalidobjects}->{invalid_ind_subpartitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_subpartitions_list}});
   $self->{invalidobjects}->{invalid_registry_components} = scalar(@{$self->{invalidobjects}->{invalid_registry_components_list}});
 }
 
@@ -366,6 +378,9 @@ sub nagios {
       push(@message, sprintf "%d invalid index partitions",
           $self->{invalidobjects}->{invalid_ind_partitions}) if
           $self->{invalidobjects}->{invalid_ind_partitions};
+      push(@message, sprintf "%d invalid index subpartitions",
+          $self->{invalidobjects}->{invalid_ind_subpartitions}) if
+          $self->{invalidobjects}->{invalid_ind_subpartitions};
       push(@message, sprintf "%d invalid registry components",
           $self->{invalidobjects}->{invalid_registry_components}) if
           $self->{invalidobjects}->{invalid_registry_components};
@@ -374,6 +389,7 @@ sub nagios {
             $self->{invalidobjects}->{invalid_objects} +
             $self->{invalidobjects}->{invalid_indexes} +
             $self->{invalidobjects}->{invalid_registry_components} +
+            $self->{invalidobjects}->{invalid_ind_subpartitions} +
             $self->{invalidobjects}->{invalid_ind_partitions}, 0, 0);
         $self->add_nagios($level, join(", ", @message));
         $message = $ERRORCODES{$level}.' - '.join(", ", @message);
@@ -390,6 +406,7 @@ sub nagios {
             'dba_objects' => 'invalid_objects_list',
             'dba_indexes' => 'invalid_indexes_list',
             'dba_ind_partitions' => 'invalid_ind_partitions_list',
+            'dba_ind_subpartitions' => 'invalid_ind_subpartitions_list',
             'dba_registry' => 'invalid_registry_components_list',
         }->{$params{name2}};
         $self->add_perfdata(sprintf "%s=%d", $category, $self->{invalidobjects}->{$category});
@@ -404,14 +421,14 @@ sub nagios {
         my $invalid_lines = 0;
         my $linespercategory = {};
 
-        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
+        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list invalid_ind_subpartitions_list)) {
           $invalid_lines += scalar(@{$self->{invalidobjects}->{$list}});
           $linespercategory->{$list} = 0;
         }
         my $output_lines = List::Util::sum(values %{$linespercategory});
         my $full = 0;
         do {
-          foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
+          foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list invalid_ind_subpartitions_list)) {
             $linespercategory->{$list}++ if scalar(@{$self->{invalidobjects}->{$list}}) > $linespercategory->{$list};
             $output_lines = List::Util::sum(values %{$linespercategory});
             $full = 1 if ($output_lines >= $maxlines || $output_lines >= $invalid_lines);
@@ -420,7 +437,7 @@ sub nagios {
         } while (! $full);
         printf "%s\n", $message;
         printf "<table style=\"border-collapse:collapse; border: 1px solid black;\">";
-        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list)) {
+        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list invalid_ind_subpartitions_list)) {
           if ($linespercategory->{$list}) {
         printf "<tr>";
         foreach (qw(Table Object)) {
@@ -448,7 +465,7 @@ sub nagios {
           printf "%-20s", $_;
         }
         printf "\n";
-        foreach my $object (@{$self->{invalidobjects}->{invalid_objects_list}}, @{$self->{invalidobjects}->{invalid_indexes_list}}, @{$self->{invalidobjects}->{invalid_registry_components_list}}, @{$self->{invalidobjects}->{invalid_ind_partitions_list}}) {
+        foreach my $object (@{$self->{invalidobjects}->{invalid_objects_list}}, @{$self->{invalidobjects}->{invalid_indexes_list}}, @{$self->{invalidobjects}->{invalid_registry_components_list}}, @{$self->{invalidobjects}->{invalid_ind_partitions_list}, @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}}) {
           printf "%-20s%s", $object->[0], $object->[1];
           printf "\n";
         }
