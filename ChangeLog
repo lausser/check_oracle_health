@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.3.1 - 2014-01-14
+- show ORA-errors in stderr (results in warning) coming from sqlplus
+
 1.9.3 - 2014-01-13
 - added subpartitions to invalid-objects
 

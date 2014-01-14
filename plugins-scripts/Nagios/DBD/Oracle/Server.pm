@@ -1667,16 +1667,27 @@ sub fetchall_array {
     $self->{errstr} = join(" ", @oerrs).' '.$exit_output;
   } else {
     my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
-    my @rows = map { [ 
-        map { convert($_) } 
-        map { s/^\s+([\.\d]+)$/$1/g; $_ }
-        map { s/\s+$//g; $_ }
-        split /\|/
-    ] } grep { ! /^\d+ rows selected/ } 
-        grep { ! /^\d+ [Zz]eilen ausgew / }
-        grep { ! /^Elapsed: / }
-        grep { ! /^\s*$/ } split(/\n/, $output);
-    $rows = \@rows;
+    if ($output =~ /^\s+\*[ \*]*$/m && 
+        $output =~ /^ERROR/m &&
+        $output =~/^ORA\-/m) {
+      my @oerrs = map {
+        /(ORA\-\d+:.*)/ ? $1 : ();
+      } split(/\n/, $output);
+      $self->{errstr} = join(" ", @oerrs);
+      $rows = [];
+      printf STDERR "%s\n", $self->{errstr};
+    } else {
+      my @rows = map { [ 
+          map { convert($_) } 
+          map { s/^\s+([\.\d]+)$/$1/g; $_ }
+          map { s/\s+$//g; $_ }
+          split /\|/
+      ] } grep { ! /^\d+ rows selected/ } 
+          grep { ! /^\d+ [Zz]eilen ausgew / }
+          grep { ! /^Elapsed: / }
+          grep { ! /^\s*$/ } split(/\n/, $output);
+      $rows = \@rows;
+    }
   }
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
