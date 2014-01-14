@@ -129,7 +129,7 @@ sub init_invalid_objects {
   @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}} =
       $self->{handle}->fetchall_array(q{
           SELECT 'dba_ind_subpartitions', subpartition_name||' of '||partition_name||' of '||index_owner||'.'||index_name||' is '||status
-          FROM dba_ind_partitions
+          FROM dba_ind_subpartitions
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
   # should be only VALID
