@@ -1266,13 +1266,14 @@ sub init {
   my $now = time;
   if (1) {
     # Maybe we have crap files for whatever reason.
+    no warnings "all";
     foreach (glob $self->system_tmpdir().'/'.$self->{mode}.'?????.*') {
       if (/\.(sql|out|err|temp)$/) {
-        if (($now - (stat $_)[9]) > 300) {
-          eval {
+        eval {
+          if (($now - (stat $_)[9]) > 300) {
             unlink $_;
-          };
-        }
+          }
+        };
       }
     }
   }
