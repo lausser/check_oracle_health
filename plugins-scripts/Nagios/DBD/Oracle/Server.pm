@@ -1601,7 +1601,7 @@ sub fetchrow_array {
     # ERROR at line 1:
     # ORA-00942: table or view does not exist
     # --> if there is a single * AND ERROR AND ORA then we surely have en error
-    if ($output =~ /^\s+\*[ \*]*$/m && 
+    if ($output =~ /^[ \*]+$/m && 
         $output =~ /^ERROR/m &&
         $output =~/^ORA\-/m) {
       my @oerrs = map {
