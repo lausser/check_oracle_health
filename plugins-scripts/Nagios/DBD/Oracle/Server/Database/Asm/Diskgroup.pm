@@ -129,7 +129,7 @@ sub nagios {
            );
       }
 
-      if ($self->{state} eq 'mounted') {
+      if ($self->{state} eq 'mounted' || $self->{state} eq 'dismounted' || $self->{state} eq 'connected') {
         # 'dg_system_usage_pct'=99.01%;90;98 percent used, warn, crit
         # 'dg_system_usage'=693MB;630;686;0;700 used, warn, crit, 0, max=total
         if ($params{mode} =~ /server::database::asm::diskgroup::usage/) {
