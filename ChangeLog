@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.3.4 - 2014-03-18
+- allow floating point numbers in thresholds
+
 1.9.3.3 - 2014-03-17
 - bugfix in diskgroups
 - bugfix in ora-error-handling
