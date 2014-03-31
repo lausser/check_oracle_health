@@ -1763,6 +1763,7 @@ sub DESTROY {
       if $self->{sql_resultfile} && -f $self->{sql_resultfile};
   unlink $self->{sql_outfile} if
       $self->{sql_outfile} && -f $self->{sql_outfile};
+  unlink $ENV{HOME}."/sqlnet.log" if -f $ENV{HOME}."/sqlnet.log";
   # der war fies. destruktor laeuft nach dem abschliessenden exit(nagios_exit)
   # und das kill/ps-zeugs vermurkst den exitcode bzw setzt ihn immer auf 0
   # kam zum vorschein bei my-modulen
