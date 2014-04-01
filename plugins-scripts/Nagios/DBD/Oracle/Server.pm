@@ -48,6 +48,7 @@ sub new {
     ident => $params{ident},
     report => $params{report},
     commit => $params{commit},
+    negate => $params{negate},
     version => 'unknown',
     instance => undef,
     database => undef,
@@ -457,6 +458,7 @@ sub merge_nagios {
 
 sub calculate_result {
   my $self = shift;
+  my $labels = shift || {};
   my $multiline = 0;
   map {
     $self->{nagios_level} = $ERRORS{$_} if 
@@ -476,7 +478,18 @@ sub calculate_result {
   } grep {
       scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
   } ("CRITICAL", "WARNING", "UNKNOWN"));
+  my $good_messages = join(($multiline ? "\n" : ", "), map {
+      join(($multiline ? "\n" : ", "), @{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } grep {
+      scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } ("OK"));
   my $all_messages_short = $bad_messages ? $bad_messages : 'no problems';
+  # if mode = my-....
+  # and there are some ok-messages
+  # output them instead of "no problems"
+  if ($self->{mode} =~ /^my\:\:/ && $good_messages) {
+    $all_messages_short = $bad_messages ? $bad_messages : $good_messages;
+  }
   my $all_messages_html = "<table style=\"border-collapse: collapse;\">".
       join("", map {
           my $level = $_;
@@ -498,7 +511,34 @@ sub calculate_result {
   } elsif ($self->{report} eq "html") {
     $self->{nagios_message} .= $all_messages_short."\n".$all_messages_html;
   }
-  $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
+  foreach my $from (keys %{$self->{negate}}) {
+    if ((uc $from) =~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/ &&
+        (uc $self->{negate}->{$from}) =~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/) {
+(uc $from), (uc $self->{negate}->{$from}), $ERRORS{uc $from}, $self->{nagios_level};
+      if ($self->{nagios_level} == $ERRORS{uc $from}) {
+        $self->{nagios_level} = $ERRORS{uc $self->{negate}->{$from}};
+      }
+    }
+  }
+  if ($self->{labelformat} eq "pnp4nagios") {
+    $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
+  } else {
+    $self->{perfdata} = join(" ", map {
+        my $perfdata = $_;
+        if ($perfdata =~ /^(.*?)=(.*)/) {
+          my $label = $1;
+          my $data = $2;
+          if (exists $labels->{$label} &&
+              exists $labels->{$label}->{$self->{labelformat}}) {
+            $labels->{$label}->{$self->{labelformat}}."=".$data;
+          } else {
+            $perfdata;
+          }
+        } else {
+          $perfdata;
+        }
+    } @{$self->{nagios}->{perfdata}});
+  }
 }
 
 sub set_global_db_thresholds {

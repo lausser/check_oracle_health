@@ -371,6 +371,7 @@ my @params = (
     "basis",
     "lookback|l=i",
     "environment|e=s%",
+    "negate=s%",
     "calcmeth=s",
     "method=s",
     "runas|r=s",
@@ -703,6 +704,7 @@ my %params = (
     report => $commandline{report},
     commit => $commandline{commit},
     calcmeth => $commandline{calcmeth},
+    negate => $commandline{negate},
 );
 
 my $server = undef;
