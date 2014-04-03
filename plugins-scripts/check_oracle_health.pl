@@ -386,6 +386,7 @@ my @params = (
     "with-mymodules-dyn-dir=s",
     "report=s",
     "commit",
+    "labelformat=s",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -487,6 +488,12 @@ if (exists $commandline{calcmeth}) {
   }
 } else {
   $commandline{calcmeth} = "classic";
+}
+
+if (exists $commandline{labelformat}) {
+  # groundwork
+} else {
+  $commandline{labelformat} = "pnp4nagios";
 }
 
 if (exists $commandline{'with-mymodules-dyn-dir'}) {
@@ -704,6 +711,7 @@ my %params = (
     report => $commandline{report},
     commit => $commandline{commit},
     calcmeth => $commandline{calcmeth},
+    labelformat => $commandline{labelformat},
     negate => $commandline{negate},
 );
 

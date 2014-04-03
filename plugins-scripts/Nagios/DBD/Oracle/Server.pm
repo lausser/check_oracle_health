@@ -37,6 +37,7 @@ sub new {
   my $class = shift;
   my %params = @_;
   my $self = {
+    mode => $params{mode},
     access => $params{method} || "dbi",
     connect => $params{connect},
     username => $params{username},
@@ -49,6 +50,7 @@ sub new {
     report => $params{report},
     commit => $params{commit},
     negate => $params{negate},
+    labelformat => $params{labelformat},
     version => 'unknown',
     instance => undef,
     database => undef,
