@@ -1636,16 +1636,24 @@ sub fetchrow_array {
   } else {
     # This so-called "best practice" leaves an open filehandle under windows
     # my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
+    #my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
+    # ORA-28001 Password expired. sqlplus exits with 0, but no resultfile is written. Errors can be found in outfile.
+    my $output = do { 
+      local (@ARGV, $/) = -f $self->{sql_resultfile} ?
+          $self->{sql_resultfile} : $self->{sql_outfile};
+      my $x = <>; 
+      close ARGV;
+      $x 
+    };
     #
     # SELECT count(*) FROM blah
     #                 *
     # ERROR at line 1:
     # ORA-00942: table or view does not exist
     # --> if there is a single * AND ERROR AND ORA then we surely have en error
-    if ($output =~ /^[ \*]+$/m && 
+    if (($output =~ /^[ \*]+$/m && 
         $output =~ /^ERROR/m &&
-        $output =~/^ORA\-/m) {
+        $output =~/^ORA\-/m) || ($output =~ /^ORA-28001/m)) {
       my @oerrs = map {
         /(ORA\-\d+:.*)/ ? $1 : ();
       } split(/\n/, $output);

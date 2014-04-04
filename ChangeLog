@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.3.6 - 2014-04-04
+- bugfix in method sqlplus. handle expired passwords 
+
 1.9.3.5 - 2014-04-01
 - remove leftover sqlnet.log files
 - implement --negate old_level=new_level
