@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.3.7 - 2014-04-06
+- switch on +epn
+
 1.9.3.6 - 2014-04-04
 - bugfix in method sqlplus. handle expired passwords 
 
