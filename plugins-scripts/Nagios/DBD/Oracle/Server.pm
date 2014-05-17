@@ -1059,6 +1059,11 @@ sub init {
         }
         $self->{username} = '/';
         $self->{password} = "";
+      } elsif ($self->{username} && $self->{username} =~ /^\/@([\w\-\._]+)/) {
+        $self->{username} = "";
+        $self->{password} = "";
+        $self->{sid} = $1;
+        $self->{connect} = $1;
       } else {
         $self->{errstr} = "Please specify database, username and password";
         return undef;
