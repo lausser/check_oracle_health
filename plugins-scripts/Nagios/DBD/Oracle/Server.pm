@@ -1405,7 +1405,7 @@ sub init {
         $self->{username} =~ /^\/@([\w\-\._]+)/) {
       # --user /@ubba1
       $self->{username} = $1;
-      $self->{sid} = $self->{connect};
+      $self->{sid} = $self->{username};
       $self->{loginstring} = "passwordstore";
     } elsif ($self->{connect} && $self->{username} && ! $self->{password} &&
         $self->{username} eq "sysdba") {
