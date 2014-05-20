@@ -24,3 +24,8 @@ Checkpoint not complete
 
 flash recovery area free
 http://www.muniqsoft.de/tipps/monatstipps/Tipp0308.pdf
+
+
+Hi, the plugin currently calculates tablespace’s max size using … SUM(DECODE(a.autoextensible, ‘YES’, a.maxbytes, ‘NO’, a.bytes)) maxbytes … IMHO it would be more exact to use … SUM(DECODE(a.autoextensible, ‘YES’, greatest(a.maxbytes,a.bytes), ‘NO’, a.bytes)) maxbytes … instead. Although the maxsize of a datafile might be limited for autoextension, it’s valid to exceed it issuing “alter database datafile …resize ..”. Using greatest() as shown above, you’ll keep these “overallocations” in mind. Kind regards, Thilo.
+
+
