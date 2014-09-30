@@ -125,13 +125,17 @@ sub init_invalid_objects {
           FROM dba_ind_partitions
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
-  # should be only USABLE
-  @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}} =
-      $self->{handle}->fetchall_array(q{
-          SELECT 'dba_ind_subpartitions', subpartition_name||' of '||partition_name||' of '||index_owner||'.'||index_name||' is '||status
-          FROM dba_ind_subpartitions
-          WHERE status <> 'USABLE' AND status <> 'N/A'
-      });
+  if ($self->version_is_minimum("10.x")) {
+    # should be only USABLE
+    @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}} =
+        $self->{handle}->fetchall_array(q{
+            SELECT 'dba_ind_subpartitions', subpartition_name||' of '||partition_name||' of '||index_owner||'.'||index_name||' is '||status
+            FROM dba_ind_subpartitions
+            WHERE status <> 'USABLE' AND status <> 'N/A'
+        });
+  } else {
+    $self->{invalidobjects}->{invalid_ind_subpartitions_list} = [];
+  }
   # should be only VALID
   if ($self->version_is_minimum("10.x")) {
     @{$self->{invalidobjects}->{invalid_registry_components_list}} =
