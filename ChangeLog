@@ -4,6 +4,7 @@
 
 1.9.4 - 2014-05-18
 - enable wallets for the dbi method (Thanks Tommi)
+- bugfix in initial handshake and 9.x
 
 1.9.3.7 - 2014-04-06
 - switch on +epn

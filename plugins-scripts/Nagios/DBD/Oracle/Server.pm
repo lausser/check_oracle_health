@@ -78,22 +78,38 @@ sub new {
       $self->{thread} = 1;
       $self->{parallel} = 'no';
     } else {
-      ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel}, $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(
-          q{ select d.platform_name,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
-          #q{ select dbms_utility.port_string,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
-      #$self->{os} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT dbms_utility.port_string FROM dual });
-      #$self->{dbuser} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT sys_context('userenv', 'session_user') FROM dual });
-      #$self->{thread} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT thread# FROM v$instance });
-      #$self->{parallel} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT parallel FROM v$instance });
+      if ($self->version_is_minimum('10')) {
+        ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel},
+            $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(q{
+            SELECT
+                d.platform_name,
+                sys_context('userenv', 'session_user'),
+                i.thread#,
+                i.parallel,
+                i.instance_name,
+                d.name
+            FROM
+                dual,
+                v$instance i,
+                v$database d
+        });
+      } else {
+        ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel},
+            $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(q{
+            SELECT
+                dbms_utility.port_string,
+                sys_context('userenv', 'session_user'),
+                i.thread#,
+                i.parallel,
+                i.instance_name,
+                d.name
+            FROM
+                dual,
+                v$instance i,
+                v$database d
+        });
+      }
       if ($self->{ident}) {
-        #$self->{instance_name} = $self->{handle}->fetchrow_array(
-        #    q{ SELECT instance_name FROM v$instance });
-        #$self->{database_name} = $self->{handle}->fetchrow_array(
-        #    q{ SELECT name FROM v$database });
         $self->{identstring} = sprintf "(host: %s inst: %s, db: %s) ",
             hostname(), $self->{instance_name}, $self->{database_name};
       }
