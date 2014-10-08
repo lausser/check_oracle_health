@@ -6,6 +6,7 @@
 - enable wallets for the dbi method (Thanks Tommi)
 - bugfix in initial handshake and 9.x
 - bugfix in invalid/dba_ind_subpartitions and 9.x
+- --noperfdata suppresses perfdata
 
 1.9.3.7 - 2014-04-06
 - switch on +epn
