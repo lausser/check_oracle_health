@@ -59,6 +59,7 @@ sub new {
   bless $self, $class;
   $self->init_nagios();
   if ($self->dbconnect(%params)) {
+    DBD::Oracle::Server::add_server($self);
     $self->{version} = $self->{handle}->fetchrow_array(
         q{ SELECT version FROM v$instance });
     if (! $self->{version}) {
@@ -114,7 +115,6 @@ sub new {
             hostname(), $self->{instance_name}, $self->{database_name};
       }
     }
-    DBD::Oracle::Server::add_server($self);
     $self->init(%params);
   }
   return $self;

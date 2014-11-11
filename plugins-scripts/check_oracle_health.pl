@@ -273,6 +273,8 @@ EOUS
        outputs instance and database names
     --commit
        turns on autocommit for the dbd::oracle module
+    --noperfdata
+       do not output performance data
 
   Tablespace-related modes check all tablespaces in one run by default.
   If only a single tablespace should be checked, use the --name parameter.
