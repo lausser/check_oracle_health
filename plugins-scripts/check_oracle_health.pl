@@ -573,11 +573,11 @@ if ($needs_restart) {
   }
   if ($runas && ($> == 0)) {
     # this was not my idea. some people connect as root to their nagios clients.
-    exec "su", "-c", sprintf("%s %s", $0, join(" ", @newargv)), "-", $runas;
+    exec "su", "-c", sprintf("%s %s", $DBD::Oracle::Server::pluginpath, join(" ", @newargv)), "-", $runas;
   } elsif ($runas) {
-    exec "sudo", "-S", "-u", $runas, $0, @newargv;
+    exec "sudo", "-S", "-u", $runas, $DBD::Oracle::Server::pluginpath, @newargv;
   } else {
-    exec $0, @newargv;  
+    exec $DBD::Oracle::Server::pluginpath, @newargv;  
     # this makes sure that even a SHLIB or LD_LIBRARY_PATH are set correctly
     # when the perl interpreter starts. Setting them during runtime does not
     # help loading e.g. libclntsh.so

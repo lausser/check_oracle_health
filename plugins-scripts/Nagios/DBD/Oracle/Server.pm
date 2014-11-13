@@ -4,6 +4,7 @@ use strict;
 use Time::HiRes;
 use IO::File;
 use File::Copy 'cp';
+use File::Basename;
 use Sys::Hostname;
 use Data::Dumper;
 
@@ -11,6 +12,8 @@ my %ERRORS=( OK => 0, WARNING => 1, CRITICAL => 2, UNKNOWN => 3 );
 my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
 
 {
+  our $pluginpath = $ENV{'NAGIOS_PLUGIN'} || $0;
+  our $pluginname = basename($pluginpath);
   our $verbose = 0;
   our $scream = 0; # scream if something is not implemented
   our $access = "dbi"; # how do we access the database. 
@@ -1604,7 +1607,7 @@ sub init {
             printf STDERR "ping exit bumm \n";
           }
           $exit_output =~ s/\n//g;
-          $exit_output =~ s/at $0//g;
+          $exit_output =~ s/at $DBD::Oracle::Server::pluginpath//g;
           chomp $exit_output;
           die $exit_output;
         }

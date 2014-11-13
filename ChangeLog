@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.3 - 2014-11-13
+- make the plugin more epn-safe
+
 1.9.4.2 - 2014-11-11
 - bugfix in initial handshake, remove an undef split
 

@@ -4,6 +4,11 @@ use strict;
 use File::Basename;
 use Data::Dumper;
 
+{
+  our $pluginpath = $ENV{'NAGIOS_PLUGIN'} || $0;
+  our $pluginname = basename($pluginpath);
+}
+
 sub new {
   my $class = shift;
   my %params = @_;
@@ -23,7 +28,7 @@ sub prepare_file_and_section {
   my $self = shift;
   if (! defined $self->{file} || ! $self->{file}) {
     # ./check_stuff --extra-opts
-    $self->{section} = basename($0);
+    $self->{section} = $Extraopts::pluginname;
     $self->{file} = $self->get_default_file();
   } elsif ($self->{file} =~ /^[^@]+$/) {
     # ./check_stuff --extra-opts=special_opts
@@ -31,7 +36,7 @@ sub prepare_file_and_section {
     $self->{file} = $self->get_default_file();
   } elsif ($self->{file} =~ /^@(.*)/) {
     # ./check_stuff --extra-opts=@/etc/myconfig.ini
-    $self->{section} = basename($0);
+    $self->{section} = $Extraopts::pluginname;
     $self->{file} = $1;
   } elsif ($self->{file} =~ /^(.*?)@(.*)/) {
     # ./check_stuff --extra-opts=special_opts@/etc/myconfig.ini
