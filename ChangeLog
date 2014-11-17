@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.4 - 2014-11-17
+- switch off -epn again (observed problems in even rarer cases)
+
 1.9.4.3 - 2014-11-13
 - make the plugin more epn-safe
 
