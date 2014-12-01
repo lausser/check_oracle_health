@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.5 - 2014-12-01
+- bugfix in method sqlplus for special characters in passwords
+
 1.9.4.4 - 2014-11-17
 - switch off -epn again (observed problems in even rarer cases)
 
