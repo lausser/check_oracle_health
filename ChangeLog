@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.6 - 2015-02-20
+- bugfix in --ident
+
 1.9.4.5 - 2014-12-01
 - bugfix in method sqlplus for special characters in passwords
 

@@ -84,38 +84,48 @@ sub new {
     } else {
       if ($self->version_is_minimum('10')) {
         ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel},
-            $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(q{
+            $self->{instance_name}, $self->{database_name},
+            $self->{global_name}, $self->{host_name}) = $self->{handle}->fetchrow_array(q{
             SELECT
                 d.platform_name,
                 sys_context('userenv', 'session_user'),
                 i.thread#,
                 i.parallel,
                 i.instance_name,
-                d.name
+                d.name,
+                g.global_name,
+                i.host_name
             FROM
                 dual,
                 v$instance i,
-                v$database d
+                v$database d,
+                global_name g
         });
       } else {
         ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel},
-            $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(q{
+            $self->{instance_name}, $self->{database_name},
+            $self->{global_name}, $self->{host_name}) = $self->{handle}->fetchrow_array(q{
             SELECT
                 dbms_utility.port_string,
                 sys_context('userenv', 'session_user'),
                 i.thread#,
                 i.parallel,
                 i.instance_name,
-                d.name
+                d.name,
+                g.global_name,
+                i.host_name
             FROM
                 dual,
                 v$instance i,
-                v$database d
+                v$database d,
+                global_name g
         });
       }
       if ($self->{ident}) {
         $self->{identstring} = sprintf "(host: %s inst: %s, db: %s) ",
-            hostname(), $self->{instance_name}, $self->{database_name};
+            $self->{host_name}, $self->{instance_name}, 
+            ($self->{global_name} && $self->{global_name} =~ /\./) ?
+                $self->{global_name} : $self->{database_name};
       }
     }
     $self->init(%params);
