@@ -685,8 +685,14 @@ sub nagios {
         $self->merge_nagios($_);
       }
     } elsif ($params{mode} =~ /server::database::tablespace::datafile::listdatafiles/) {
-      foreach (sort { $a->{name} cmp $b->{name}; }  @{$self->{datafiles}}) {
-        printf "%s\n", $_->{name};
+      if ($params{report} eq "short") {
+        foreach (@{$self->{datafiles}}) {
+          printf "%s %s\n", $_->{path}, $_->{name};
+        }
+      } else {
+        foreach (sort { $a->{name} cmp $b->{name}; }  @{$self->{datafiles}}) {
+          printf "%s\n", $_->{name};
+        }
       }
       $self->add_nagios_ok("have fun");
     } elsif ($params{mode} =~ /server::database::tablespace::datafile/) {

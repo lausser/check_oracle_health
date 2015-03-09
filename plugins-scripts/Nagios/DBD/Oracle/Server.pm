@@ -54,6 +54,7 @@ sub new {
     commit => $params{commit},
     negate => $params{negate},
     labelformat => $params{labelformat},
+    uniquelabels => $params{uniquelabels},
     version => 'unknown',
     instance => undef,
     database => undef,

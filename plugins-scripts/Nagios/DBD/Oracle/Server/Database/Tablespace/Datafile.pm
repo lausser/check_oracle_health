@@ -177,7 +177,7 @@ sub nagios {
           sprintf ("%s: %.2f IO Operations per Second", 
               $self->{name}, $self->{io_total_per_sec}));
       $self->add_perfdata(sprintf "'dbf_%s_io_total_per_sec'=%.2f;%d;%d",
-          $self->{name}, $self->{io_total_per_sec},
+          $params{uniquelabels} ? $self->{path} : $self->{name}, $self->{io_total_per_sec},
           $self->{warningrange}, $self->{criticalrange});
     }
   }

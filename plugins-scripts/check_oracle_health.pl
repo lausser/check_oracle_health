@@ -390,6 +390,7 @@ my @params = (
     "report=s",
     "commit",
     "labelformat=s",
+    "uniquelabels",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -715,6 +716,7 @@ my %params = (
     commit => $commandline{commit},
     calcmeth => $commandline{calcmeth},
     labelformat => $commandline{labelformat},
+    uniquelabels => $commandline{uniquelabels},
     negate => $commandline{negate},
 );
 
