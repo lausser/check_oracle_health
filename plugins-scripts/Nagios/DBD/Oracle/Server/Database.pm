@@ -25,6 +25,7 @@ sub new {
     tablespaces => [],
     num_datafiles => undef,
     num_datafiles_max => undef,
+    dbusers => [],
   };
   bless $self, $class;
   $self->init(%params);
@@ -51,6 +52,10 @@ sub init {
     } else {
       $self->add_nagios_critical("unable to aquire flash recovery area info");
     }
+  } elsif ($params{mode} =~ /server::database::dataguard/) {
+    $self->{dataguard} = DBD::Oracle::Server::Database::Dataguard->new(%params);
+  } elsif ($params{mode} =~ /server::database::asm/) {
+    $self->{asm} = DBD::Oracle::Server::Database::Asm->new(%params);
   } elsif ($params{mode} =~ /server::database::invalidobjects/) {
     $self->init_invalid_objects(%params);
   } elsif ($params{mode} =~ /server::database::stalestats/) {
@@ -68,6 +73,14 @@ sub init {
       ! defined $self->{num_datafiles}) {
       $self->add_nagios_critical("unable to get number of datafiles");
     }
+  } elsif ($params{mode} =~ /server::database::expiredpw/) {
+    DBD::Oracle::Server::Database::User::init_users(%params);
+    if (my @users = 
+        DBD::Oracle::Server::Database::User::return_users()) {
+      $self->{users} = \@users;
+    } else {
+      $self->add_nagios_critical("unable to aquire user info");
+    }
   }
 }
 
@@ -77,41 +90,102 @@ sub init_invalid_objects {
   my $invalid_objects = undef;
   my $invalid_indexes = undef;
   my $invalid_ind_partitions = undef;
+  my $invalid_ind_subpartitions = undef;
   my $unrecoverable_datafiles = undef;
-  $self->{invalidobjects}->{invalid_objects} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_objects 
-          WHERE status = 'INVALID' AND object_name NOT LIKE 'BIN$%'
-      });
+  @{$self->{invalidobjects}->{invalid_objects_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT
+            'dba_objects', O.object_type||' '||O.owner||'.'||O.object_name||' is '||O.status
+          FROM
+            dba_objects O
+          LEFT OUTER JOIN
+            DBA_MVIEW_refresh_times V
+          ON
+            O.object_name = V.NAME
+          AND
+            O.owner = V.owner
+          WHERE
+            (LAST_REFRESH <= (SELECT sysdate - ? FROM dual) OR LAST_REFRESH is null)
+          AND
+            STATUS = 'INVALID'
+          AND
+            O.object_name NOT LIKE 'BIN$%'
+      }, ($params{lookback} || 2));
   # should be only N/A or VALID
-  $self->{invalidobjects}->{invalid_indexes} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_indexes 
+  @{$self->{invalidobjects}->{invalid_indexes_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT 'dba_indexes', index_type||' index '||owner||'.'||index_name||' of '||table_owner||'.'||table_name||' is '||status
+          FROM dba_indexes
           WHERE status <> 'VALID' AND status <> 'N/A'
       });
   # should be only USABLE
-  $self->{invalidobjects}->{invalid_ind_partitions} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_ind_partitions 
+  @{$self->{invalidobjects}->{invalid_ind_partitions_list}} =
+      $self->{handle}->fetchall_array(q{
+          SELECT 'dba_ind_partitions', partition_name||' of '||index_owner||'.'||index_name||' is '||status
+          FROM dba_ind_partitions
           WHERE status <> 'USABLE' AND status <> 'N/A'
       });
+  if ($self->version_is_minimum("10.x")) {
+    # should be only USABLE
+    @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}} =
+        $self->{handle}->fetchall_array(q{
+            SELECT 'dba_ind_subpartitions', subpartition_name||' of '||partition_name||' of '||index_owner||'.'||index_name||' is '||status
+            FROM dba_ind_subpartitions
+            WHERE status <> 'USABLE' AND status <> 'N/A'
+        });
+  } else {
+    $self->{invalidobjects}->{invalid_ind_subpartitions_list} = [];
+  }
   # should be only VALID
-  $self->{invalidobjects}->{invalid_registry_components} =
-      $self->{handle}->fetchrow_array(q{
-          SELECT COUNT(*) 
-          FROM dba_registry
-          WHERE status <> 'VALID'
-      });
+  if ($self->version_is_minimum("10.x")) {
+    @{$self->{invalidobjects}->{invalid_registry_components_list}} =
+        $self->{handle}->fetchall_array(q{
+            SELECT 'dba_registry', namespace||'.'||comp_name||'-'||version||' is '||status
+            FROM dba_registry
+            WHERE status <> 'VALID'
+        });
+  } else {
+    @{$self->{invalidobjects}->{invalid_registry_components_list}} =
+        $self->{handle}->fetchall_array(q{
+            SELECT 'dba_registry', 'SCHEMA.'||comp_name||'-'||version||' is '||status
+            FROM dba_registry
+            WHERE status <> 'VALID'
+        });
+  }
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
       ! defined $self->{invalidobjects}->{invalid_indexes} ||
       ! defined $self->{invalidobjects}->{invalid_registry_components} ||
+      ! defined $self->{invalidobjects}->{invalid_ind_subpartitions} ||
       ! defined $self->{invalidobjects}->{invalid_ind_partitions}) {
-    $self->add_nagios_critical("unable to get invalid objects");
-    return undef;
+    #$self->add_nagios_critical("unable to get invalid objects");
+    #return undef;
   }
+  foreach my $cat (qw(invalid_objects_list invalid_indexes_list invalid_ind_partitions_list invalid_ind_subpartitions_list invalid_registry_components_list)) {
+    my @tmp_list = ();
+    foreach my $element (@{$self->{invalidobjects}->{$cat}}) {
+      next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
+      my $name = $element->[1];
+      if ($params{regexp}) {
+        # can be used to pick system an application accounts
+        # --name 'of (SYS|SYSTEM|OUTLN|SCOTT|ADAMS|JONES|CLARK|BLAKE|WOOD|STEEL|CLOTH|PAPER|HR|OE|SH|OE|SH|DEMO|ANONYMOUS|%APEX%|AURORA\$ORB\$UNAUTHENTICATED|AWR_STAGE|CSMIG|CTXSYS|DBSNMP|DIP|DMSYS|DSSYS|EXFSYS|LBACSYS|MDSYS|ORACLE_OCM|ORDPLUGINS|ORDSYS|PERFSTAT|TRACESVR|TSMSYS|XDB|TSDSADM|APPQOSSYS)\.'
+        if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
+          my $selectname = substr($params{selectname}, 1);
+          next if $name =~ /$selectname/;
+        } else {
+          next if $params{selectname} && $name !~ /$params{selectname}/i;
+        }
+      } else {
+        next if $params{selectname} && (lc $params{selectname} ne lc $name);
+      }
+      push(@tmp_list, $element);
+    }
+    @{$self->{invalidobjects}->{$cat}} = @tmp_list;
+  }
+  $self->{invalidobjects}->{invalid_objects} = scalar(@{$self->{invalidobjects}->{invalid_objects_list}});
+  $self->{invalidobjects}->{invalid_indexes} = scalar(@{$self->{invalidobjects}->{invalid_indexes_list}});
+  $self->{invalidobjects}->{invalid_ind_partitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_partitions_list}});
+  $self->{invalidobjects}->{invalid_ind_subpartitions} = scalar(@{$self->{invalidobjects}->{invalid_ind_subpartitions_list}});
+  $self->{invalidobjects}->{invalid_registry_components} = scalar(@{$self->{invalidobjects}->{invalid_registry_components_list}});
 }
 
 sub init_stale_objects {
@@ -152,13 +226,115 @@ sub init_stale_objects {
 sub init_corrupted_blocks {
   my $self = shift;
   my %params = @_;
-  $self->{corruptedblocks} = $self->{handle}->fetchrow_array(q{
+  $self->{numcorruptedblocks} = $self->{handle}->fetchrow_array(q{
       SELECT COUNT(*) FROM v$database_block_corruption
   });
-  if (! defined $self->{corruptedblocks}) {
+  if (! defined $self->{numcorruptedblocks}) {
     $self->add_nagios_critical("unable to get corrupted blocks");
     return undef;
   }
+  @{$self->{corruptedobjects}->{extents_list}} =
+      $self->{handle}->fetchall_array(q{
+      WITH mytable AS (
+      SELECT
+          dbe.owner db_owner,
+          dbe.segment_name obj_name,
+          dbe.partition_name part_name,
+          dbe.segment_type typ,
+          vdbc.corruption_type corruption_type,
+          vdbc.file# file_number,
+          vdbc.block# block_number,
+          GREATEST(dbe.block_id, vdbc.block#) corr_start_block,
+          LEAST(dbe.block_id+dbe.blocks-1, vdbc.block#+vdbc.blocks-1) corr_end_block,
+          LEAST(dbe.block_id+dbe.blocks-1, vdbc.block#+vdbc.blocks-1) - GREATEST(dbe.block_id, vdbc.block#) + 1 blocks_corrupted,
+          'dba_extents' description
+      FROM
+          dba_extents dbe,
+          v$database_block_corruption vdbc
+      WHERE 1=1
+      AND dbe.file_id = vdbc.file#
+      AND dbe.block_id <= vdbc.block# + vdbc.blocks - 1
+      AND dbe.block_id + dbe.blocks - 1 >= vdbc.block#
+      )
+      SELECT
+         description, db_owner||'.'||obj_name||' is '||corruption_type||' corrupted'
+      FROM mytable
+  });
+  @{$self->{corruptedobjects}->{segments_list}} =
+      $self->{handle}->fetchall_array(q{
+      WITH mytable AS (
+          SELECT
+              dbs.owner db_owner,
+              dbs.segment_name obj_name,
+              dbs.partition_name part_name,
+              dbs.segment_type typ,
+              vdbc.corruption_type corruption_type,
+              vdbc.file# file_number,
+              vdbc.block# block_number,
+              dbs.header_block corr_start_block,
+              dbs.header_block corr_end_block,
+              1 blocks_corrupted,
+              'dba_segments' description
+          FROM
+              dba_segments dbs,
+              v$database_block_corruption vdbc
+          WHERE 1=1
+          AND dbs.header_file = vdbc.file#
+          AND dbs.header_block BETWEEN vdbc.block# AND vdbc.block#+vdbc.blocks-1
+      )
+      SELECT
+         description, db_owner||'.'||obj_name||' is '||corruption_type||' corrupted'
+      FROM mytable
+  });
+  @{$self->{corruptedobjects}->{free_list}} =
+      $self->{handle}->fetchall_array(q{
+      WITH mytable AS (
+          SELECT
+              'SYS' db_owner,
+              'file'||vdbc.file#||'block'||vdbc.block# obj_name,
+              'noname' part_name,
+              'free' typ,
+              vdbc.corruption_type corruption_type,
+              vdbc.file# file_number,
+              vdbc.block# block_number,
+              GREATEST(dbf.block_id, vdbc.block#) corr_start_block,
+              LEAST(dbf.block_id+dbf.blocks-1, vdbc.block#+vdbc.blocks-1) corr_end_block,
+              LEAST(dbf.block_id+dbf.blocks-1, vdbc.block#+vdbc.blocks-1) - GREATEST(dbf.block_id, vdbc.block#) + 1 blocks_corrupted,
+              'dba_free_space' description
+          FROM
+              dba_free_space dbf,
+              v$database_block_corruption vdbc
+          WHERE 1=1
+          AND dbf.file_id = vdbc.file#
+          AND dbf.block_id <= vdbc.block# + vdbc.blocks -1
+          AND dbf.block_id + dbf.blocks - 1 >= vdbc.block#
+      )
+      SELECT
+         description, db_owner||'.'||obj_name||' is '||corruption_type||' corrupted'
+      FROM mytable
+  });
+  foreach my $cat (qw(extents_list segments_list free_list)) {
+    my @tmp_list = ();
+    foreach my $element (@{$self->{corruptedobjects}->{$cat}}) {
+      next if $params{name2} && (lc $params{name2} ne lc $element->[0]);
+      my $name = $element->[1];
+      if ($params{regexp}) {
+        if ($params{selectname} && substr($params{selectname}, 0, 1) eq '!') {
+          my $selectname = substr($params{selectname}, 1);
+          next if $name =~ /$selectname/;
+        } else {
+          next if $params{selectname} && $name !~ /$params{selectname}/i;
+        }
+      } else {
+        next if $params{selectname} && (lc $params{selectname} ne lc $name);
+      }
+      push(@tmp_list, $element);
+    }
+    @{$self->{corruptedobjects}->{$cat}} = @tmp_list;
+  }
+  $self->{corruptedobjects}->{extents} = scalar(@{$self->{corruptedobjects}->{extents_list}});
+  $self->{corruptedobjects}->{segments} = scalar(@{$self->{corruptedobjects}->{segments_list}});
+  $self->{corruptedobjects}->{free} = scalar(@{$self->{corruptedobjects}->{free_list}});
 }
 
 sub nagios {
@@ -187,8 +363,16 @@ sub nagios {
         $_->nagios(%params);
         $self->merge_nagios($_);
       }
+    } elsif ($params{mode} =~ /server::database::dataguard/) {
+      $self->{dataguard}->nagios(%params);
+      $self->merge_nagios($self->{dataguard});
+    } elsif ($params{mode} =~ /server::database::asm/) {
+      $self->{asm}->nagios(%params);
+      $self->merge_nagios($self->{asm});
     } elsif ($params{mode} =~ /server::database::invalidobjects/) {
       my @message = ();
+      my $message = undef;
+      my $level = undef;
       push(@message, sprintf "%d invalid objects",
           $self->{invalidobjects}->{invalid_objects}) if
           $self->{invalidobjects}->{invalid_objects};
@@ -198,21 +382,103 @@ sub nagios {
       push(@message, sprintf "%d invalid index partitions",
           $self->{invalidobjects}->{invalid_ind_partitions}) if
           $self->{invalidobjects}->{invalid_ind_partitions};
+      push(@message, sprintf "%d invalid index subpartitions",
+          $self->{invalidobjects}->{invalid_ind_subpartitions}) if
+          $self->{invalidobjects}->{invalid_ind_subpartitions};
       push(@message, sprintf "%d invalid registry components",
           $self->{invalidobjects}->{invalid_registry_components}) if
           $self->{invalidobjects}->{invalid_registry_components};
       if (scalar(@message)) {
-        $self->add_nagios($self->check_thresholds(
+        my $level = $self->check_thresholds(
             $self->{invalidobjects}->{invalid_objects} +
             $self->{invalidobjects}->{invalid_indexes} +
             $self->{invalidobjects}->{invalid_registry_components} +
-            $self->{invalidobjects}->{invalid_ind_partitions}, 0.1, 0.1),
-            join(", ", @message));
+            $self->{invalidobjects}->{invalid_ind_subpartitions} +
+            $self->{invalidobjects}->{invalid_ind_partitions}, 0, 0);
+        $self->add_nagios($level, join(", ", @message));
+        $message = $ERRORCODES{$level}.' - '.join(", ", @message);
+        $self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
       } else {
         $self->add_nagios_ok("no invalid objects found");
+        $message = "OK - no invalid objects found";
+        $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
       }
-      foreach (sort keys %{$self->{invalidobjects}}) {
-        $self->add_perfdata(sprintf "%s=%d", $_, $self->{invalidobjects}->{$_});
+      # invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list
+      # dba_objects dba_indexes dba_ind_partitions dba_registry
+      if ($params{name2}) {
+        my $category = {
+            'dba_objects' => 'invalid_objects_list',
+            'dba_indexes' => 'invalid_indexes_list',
+            'dba_ind_partitions' => 'invalid_ind_partitions_list',
+            'dba_ind_subpartitions' => 'invalid_ind_subpartitions_list',
+            'dba_registry' => 'invalid_registry_components_list',
+        }->{$params{name2}};
+        $self->add_perfdata(sprintf "%s=%d", $category, $self->{invalidobjects}->{$category});
+      } else {
+        foreach (grep !/_list$/, sort keys %{$self->{invalidobjects}}) {
+          $self->add_perfdata(sprintf "%s=%d", $_, $self->{invalidobjects}->{$_});
+        }
+      }
+      if ($self->{nagios_level} && $params{report} eq "html") {
+        require List::Util;
+        my $maxlines = 10;
+        my $invalid_lines = 0;
+        my $linespercategory = {};
+
+        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list invalid_ind_subpartitions_list)) {
+          $invalid_lines += scalar(@{$self->{invalidobjects}->{$list}});
+          $linespercategory->{$list} = 0;
+        }
+        my $output_lines = List::Util::sum(values %{$linespercategory});
+        my $full = 0;
+        do {
+          foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list invalid_ind_subpartitions_list)) {
+            $linespercategory->{$list}++ if scalar(@{$self->{invalidobjects}->{$list}}) > $linespercategory->{$list};
+            $output_lines = List::Util::sum(values %{$linespercategory});
+            $full = 1 if ($output_lines >= $maxlines || $output_lines >= $invalid_lines);
+            last if $full;
+          }
+        } while (! $full);
+        printf "%s\n", $message;
+        printf "<table style=\"border-collapse:collapse; border: 1px solid black;\">";
+        foreach my $list (qw(invalid_objects_list invalid_indexes_list invalid_registry_components_list invalid_ind_partitions_list invalid_ind_subpartitions_list)) {
+          if ($linespercategory->{$list}) {
+        printf "<tr>";
+        foreach (qw(Table Object)) {
+          printf "<th style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</th>", $_;
+        }
+        printf "</tr>";
+            foreach my $object (@{$self->{invalidobjects}->{$list}}[0..$linespercategory->{$list} - 1]) {
+
+              printf "<tr>";
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</td>", $object->[0];
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px; white-space: nowrap\">%s</td>", $object->[1];
+              printf "</tr>";
+            }
+            if ($linespercategory->{$list} < scalar(@{$self->{invalidobjects}->{$list}})) {
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td colspan=\"2\" class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">... (%d more)</td>", scalar(@{$self->{invalidobjects}->{$list}}) - $linespercategory->{$list};
+              printf "</tr>";
+            }
+          }
+        }
+        printf "</table>\n";
+        printf "<!--\nASCII_NOTIFICATION_START\n";
+        foreach (qw(Table Object)) {
+          printf "%-20s", $_;
+        }
+        printf "\n";
+        foreach my $object (
+            @{$self->{invalidobjects}->{invalid_objects_list}},
+            @{$self->{invalidobjects}->{invalid_indexes_list}},
+            @{$self->{invalidobjects}->{invalid_registry_components_list}},
+            @{$self->{invalidobjects}->{invalid_ind_partitions_list}},
+            @{$self->{invalidobjects}->{invalid_ind_subpartitions_list}}) {
+          printf "%-20s%s", $object->[0], $object->[1];
+          printf "\n";
+        }
+        printf "ASCII_NOTIFICATION_END\n-->\n";
       }
     } elsif ($params{mode} =~ /server::database::stalestats/) {
       $self->add_nagios(
@@ -222,12 +488,96 @@ sub nagios {
           $self->{staleobjects},
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ /server::database::blockcorruption/) {
-      $self->add_nagios(
-          $self->check_thresholds($self->{corruptedblocks}, "1", "10"),
-          sprintf "%d database blocks are corrupted", $self->{corruptedblocks});
-      $self->add_perfdata(sprintf "corrupted_blocks=%d;%s;%s",
-          $self->{corruptedblocks},
-          $self->{warningrange}, $self->{criticalrange});
+      #$self->add_nagios(
+      #    $self->check_thresholds($self->{corruptedblocks}, "1", "10"),
+      #    sprintf "%d database blocks are corrupted", $self->{corruptedblocks});
+      #$self->add_perfdata(sprintf "corrupted_blocks=%d;%s;%s",
+      #    $self->{corruptedblocks},
+      #    $self->{warningrange}, $self->{criticalrange});
+      my @message = ();
+      my $message = undef;
+      my $level = undef;
+      push(@message, sprintf "%d corrupt extents",
+          $self->{corruptedobjects}->{extents}) if
+          $self->{corruptedobjects}->{extents};
+      push(@message, sprintf "%d corrupt segment headers",
+          $self->{corruptedobjects}->{segments}) if
+          $self->{corruptedobjects}->{segments};
+      push(@message, sprintf "%d corrupt free blocks",
+          $self->{corruptedobjects}->{free}) if
+          $self->{corruptedobjects}->{free};
+      if (scalar(@message)) {
+        my $level = $self->check_thresholds(
+            $self->{corruptedobjects}->{extents} +
+            $self->{corruptedobjects}->{segments} +
+            $self->{corruptedobjects}->{free}, 0.1, 0.1);
+        $self->add_nagios($level, join(", ", @message));
+        $message = $ERRORCODES{$level}.' - '.join(", ", @message);
+        $self->supress_nagios($level) if $self->{nagios_level} && $params{report} eq "html";
+      } else {
+        $self->add_nagios_ok("no corrupt blocks found");
+        $message = "OK - no corrupt blocks found";
+        $self->supress_nagios(0) if $self->{nagios_level} && $params{report} eq "html";
+      }
+      foreach (grep !/_list$/, sort keys %{$self->{corruptedobjects}}) {
+        $self->add_perfdata(sprintf "%s=%d", $_, $self->{corruptedobjects}->{$_});
+      }
+      if ($self->{nagios_level} && $params{report} eq "html") {
+        require List::Util;
+        my $maxlines = 10;
+        my $invalid_lines = 0;
+        my $linespercategory = {};
+
+        foreach my $list (qw(extents_list segments_list free_list)) {
+          $invalid_lines += scalar(@{$self->{corruptedobjects}->{$list}});
+          $linespercategory->{$list} = 0;
+        }
+        my $output_lines = List::Util::sum(values %{$linespercategory});
+        my $full = 0;
+        do {
+          foreach my $list (qw(extents_list segments_list free_list)) {
+            $linespercategory->{$list}++ if scalar(@{$self->{corruptedobjects}->{$list}}) > $linespercategory->{$list};
+            $output_lines = List::Util::sum(values %{$linespercategory});
+            $full = 1 if ($output_lines >= $maxlines || $output_lines >= $invalid_lines);
+            last if $full;
+          }
+        } while (! $full);
+        printf "%s\n", $message;
+        printf "<table style=\"border-collapse:collapse; border: 1px solid black;\">";
+        foreach my $list (qw(extents_list segments_list free_list)) {
+          if ($linespercategory->{$list}) {
+        printf "<tr>";
+        foreach (qw(Table Object)) {
+          printf "<th style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</th>", $_;
+        }
+        printf "</tr>";
+            foreach my $object (@{$self->{corruptedobjects}->{$list}}[0..$linespercategory->{$list} - 1]) {
+
+              printf "<tr>";
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">%s</td>", $object->[0];
+              printf "<td class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px; white-space: nowrap\">%s</td>", $object->[1];
+              printf "</tr>";
+            }
+            if ($linespercategory->{$list} < scalar(@{$self->{corruptedobjects}->{$list}})) {
+              printf "<tr style=\"border: 1px solid black;\">";
+              printf "<td colspan=\"2\" class=\"serviceCRITICAL\" style=\"text-align: left; padding-left: 4px; padding-right: 6px;\">... (%d more)</td>", scalar(@{$self->{corruptedobjects}->{$list}}) - $linespercategory->{$list};
+              printf "</tr>";
+            }
+          }
+        }
+        printf "</table>\n";
+        printf "<!--\nASCII_NOTIFICATION_START\n";
+        foreach (qw(Table Object)) {
+          printf "%-20s", $_;
+        }
+        printf "\n";
+        foreach my $object (@{$self->{corruptedobjects}->{extents_list}}, @{$self->{corruptedobjects}->{segments_list}}, @{$self->{corruptedobjects}->{free_list}}) {
+          printf "%-20s%s", $object->[0], $object->[1];
+          printf "\n";
+        }
+        printf "ASCII_NOTIFICATION_END\n-->\n";
+      }
     } elsif ($params{mode} =~ /server::database::datafilesexisting/) {
         my $datafile_usage = $self->{num_datafiles} / 
             $self->{num_datafiles_max} * 100;
@@ -243,6 +593,11 @@ sub nagios {
           $self->{num_datafiles_max} / 100 * $self->{warningrange},
           $self->{num_datafiles_max} / 100 * $self->{criticalrange},
           $self->{num_datafiles_max});
+    } elsif ($params{mode} =~ /server::database::expiredpw/) {
+      foreach (@{$self->{users}}) {
+        $_->nagios(%params);
+        $self->merge_nagios($_);
+      }
     }
   }
 }

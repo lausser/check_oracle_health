@@ -44,7 +44,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
     } elsif ($params{mode} =~
         /server::database::tablespace::segment::extendspace/) {
       my @tablespaceresult = $params{handle}->fetchall_array(q{
-          SELECT /*+ RULE */
+          SELECT
               -- tablespace, segment, extent
               -- aber dadurch, dass nur das letzte extent selektiert wird
               -- werden praktisch nur tablespace und segmente ausgegeben

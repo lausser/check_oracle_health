@@ -20,10 +20,14 @@ EXTRA_MODULES=\
   Nagios/DBD/Oracle/Server/Instance/Enqueue.pm \
   Nagios/DBD/Oracle/Server/Instance/Sysstat.pm \
   Nagios/DBD/Oracle/Server/Instance.pm \
+  Nagios/DBD/Oracle/Server/Database/User.pm \
+  Nagios/DBD/Oracle/Server/Database/Dataguard.pm \
   Nagios/DBD/Oracle/Server/Database/FlashRecoveryArea.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace/Datafile.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace/Segment.pm \
   Nagios/DBD/Oracle/Server/Database/Tablespace.pm \
+  Nagios/DBD/Oracle/Server/Database/Asm/Diskgroup.pm \
+  Nagios/DBD/Oracle/Server/Database/Asm.pm \
   Nagios/DBD/Oracle/Server/Database.pm \
   Nagios/DBD/Oracle/Server.pm \
   Nagios/Extraopts.pm
@@ -47,7 +51,7 @@ AM_INSTALL_PROGRAM_FLAGS=@INSTALL_OPTS@
 
 $(libexec_SCRIPTS) : $(EXTRA_DIST)
 	$(ECHO) "#! #PERL# -w" | $(AWK) -f ./subst > $@
-#since 1.5.1	$(ECHO) "# nagios: -epn" >> $@
+	$(ECHO) "# nagios: -epn" >> $@
 	$(ECHO) >> $@
 	$(ECHO) "my %ERRORS=( OK => 0, WARNING => 1, CRITICAL => 2, UNKNOWN => 3 );" >> $@
 	$(ECHO) "my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );" >> $@

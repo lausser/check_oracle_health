@@ -224,6 +224,8 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
       }
       foreach (@tablespaceresult) {
         my ($name, $status, $type, $extentmgmt, $bytes, $bytes_max, $bytes_free) = @{$_};
+        next if $params{notemp} && ($type eq "UNDO" || $type eq "TEMPORARY");
+        next if $params{noreadonly} && ($status eq "READ ONLY");
         if ($params{regexp}) {
           next if $params{selectname} && $name !~ /$params{selectname}/;
         } else {
@@ -386,7 +388,9 @@ sub init {
   $self->init_nagios();
   $self->set_local_db_thresholds(%params);
   if ($params{mode} =~ /server::database::tablespace::(usage|free)/) {
-    if (! defined $self->{bytes_max}) {
+    if (! defined $self->{bytes_max} || $self->{bytes_max} eq '') { 
+      # eq '' kommt z.b. vor, wenn ein datafile online_status recover hat
+      # in dba_data_files sind dann bytes und maxbytes nicht belegt (Null)
       $self->{bytes} = 0;
       $self->{bytes_max} = 0;
       $self->{bytes_free} = 0;
@@ -504,11 +508,13 @@ sub nagios {
       if (! $self->{bytes_max}) {
         $self->check_thresholds($self->{percent_used}, "90", "98");
         if ($self->{status} eq 'offline') {
-          $self->add_nagios_warning(
+          $self->add_nagios(
+              defined $params{mitigation} ? $params{mitigation} : 1,
               sprintf("tbs %s is offline", $self->{name})
           );
         } else {
-          $self->add_nagios_critical(
+          $self->add_nagios(
+              defined $params{mitigation} ? $params{mitigation} : 2,
               sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
           );
         }
@@ -573,12 +579,14 @@ sub nagios {
         if (! $self->{bytes_max}) {
           $self->check_thresholds($self->{percent_used}, "5:", "2:");
           if ($self->{status} eq 'offline') {
-            $self->add_nagios_warning(
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 1,
                 sprintf("tbs %s is offline", $self->{name})
             );
           } else {
-            $self->add_nagios_critical(
-                sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name}) 
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 2,
+                sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
             );
           }
         } else {
@@ -627,12 +635,14 @@ sub nagios {
           $self->{criticalrange} .= ':';
           $self->check_thresholds($self->{real_bytes_free}, "5242880:", "1048576:");      
           if ($self->{status} eq 'offline') {
-            $self->add_nagios_warning(
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 1,
                 sprintf("tbs %s is offline", $self->{name})
             );
           } else {
-            $self->add_nagios_critical(
-                sprintf("tbs %s has a problem, maybe needs recovery?", $self->{name})     
+            $self->add_nagios(
+                defined $params{mitigation} ? $params{mitigation} : 2,
+                sprintf("tbs %s has has a problem, maybe needs recovery?", $self->{name})
             );
           }
         } else {
@@ -675,8 +685,14 @@ sub nagios {
         $self->merge_nagios($_);
       }
     } elsif ($params{mode} =~ /server::database::tablespace::datafile::listdatafiles/) {
-      foreach (sort { $a->{name} cmp $b->{name}; }  @{$self->{datafiles}}) {
-        printf "%s\n", $_->{name};
+      if ($params{report} eq "short") {
+        foreach (@{$self->{datafiles}}) {
+          printf "%s %s\n", $_->{path}, $_->{name};
+        }
+      } else {
+        foreach (sort { $a->{name} cmp $b->{name}; }  @{$self->{datafiles}}) {
+          printf "%s\n", $_->{name};
+        }
       }
       $self->add_nagios_ok("have fun");
     } elsif ($params{mode} =~ /server::database::tablespace::datafile/) {

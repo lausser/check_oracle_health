@@ -36,6 +36,9 @@ my @modes = (
   ['server::connectiontime',
       'connection-time', undef,
       'Time to connect to the server' ],
+  ['server::database::expiredpw',
+      'password-expiration', undef,
+      'Check the password expiry date for users' ],
   ['server::instance::connectedusers',
       'connected-users', undef,
       'Number of currently connected users' ],
@@ -108,6 +111,12 @@ my @modes = (
   ['server::database::datafilesexisting',
       'datafiles-existing', undef,
       'Percentage of the maximum possible number of datafiles' ],
+  ['server::database::asm::diskgroup::usage',
+      'asm-diskgroup-usage', undef,
+      'Used space in diskgroups'],
+  ['server::database::asm::diskgroup::free',
+      'asm-diskgroup-free', undef,
+      'Free space in diskgroups'],
   ['server::instance::sga::sharedpool::softparse',
       'soft-parse-ratio', undef,
       'Percentage of soft parses' ],
@@ -171,6 +180,12 @@ my @modes = (
   ['server::instance::sysstat::rate',
       'sysstat', undef,
       'change of sysstat values over time' ],
+  ['server::database::dataguard::lag',
+      'dataguard-lag', undef,
+      'Dataguard standby lag' ],
+  ['server::database::dataguard::mrp_status',
+      'dataguard-mrp-status', undef,
+      'Dataguard standby MRP status' ],
   ['server::database::flash_recovery_area::usage',
       'flash-recovery-area-usage', undef,
       'Used space in flash recovery area' ],
@@ -189,6 +204,9 @@ my @modes = (
   ['server::database::tablespace::datafile::listdatafiles',
       'list-datafiles', undef,
       'convenience function which lists all datafiles' ],
+  ['server::database::asm::diskgroup::listdiskgroups',
+      'list-asm-diskgroups', undef,
+      'convenience function which lists all asm diskgroups' ],
   ['server::instance::enqueue::listenqueues',
       'list-enqueues', undef,
       'convenience function which lists all enqueues' ],
@@ -255,10 +273,16 @@ EOUS
        outputs instance and database names
     --commit
        turns on autocommit for the dbd::oracle module
+    --noperfdata
+       do not output performance data
 
   Tablespace-related modes check all tablespaces in one run by default.
   If only a single tablespace should be checked, use the --name parameter.
   The same applies to datafile-related modes.
+  If an additional --regexp is added, --name's argument will be interpreted
+  as a regular expression.
+  The parameter --mitigation lets you classify the severity of an offline
+  tablespace. 
 
   tablespace-remaining-time will take historical data into account. The number
   of days in the past can be given with the --lookback parameter. (Default: 30)
@@ -269,8 +293,8 @@ EOUS
   --name="select count(*) from v\$session where status = 'ACTIVE'"
   you can say 
   --name=select%20count%28%2A%29%20from%20v%24session%20where%20status%20%3D%20%27ACTIVE%27
-  For your convenience you can call check_oracle_health with the --encode
-  option and it will encode the standard input.
+  For your convenience you can call check_oracle_health with --mode encode
+  and it will encode the standard input.
 
 EOUS
 #
@@ -334,10 +358,15 @@ my @params = (
     "tablespace=s",
     "datafile=s",
     "waitevent=s",
+    "offlineok",
+    "mitigation=s",
+    "notemp",
+    "noreadonly",
     "name=s",
     "name2=s",
     "regexp",
     "perfdata",
+    "noperfdata",
     "warning=s",
     "critical=s",
     "dbthresholds:s",
@@ -345,6 +374,7 @@ my @params = (
     "basis",
     "lookback|l=i",
     "environment|e=s%",
+    "negate=s%",
     "calcmeth=s",
     "method=s",
     "runas|r=s",
@@ -359,6 +389,8 @@ my @params = (
     "with-mymodules-dyn-dir=s",
     "report=s",
     "commit",
+    "labelformat=s",
+    "uniquelabels",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -397,6 +429,25 @@ if ($commandline{mode} eq "encode") {
   $input =~ s/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg;
   printf "%s\n", $input;
   exit $ERRORS{OK};
+} elsif ($commandline{mode} eq "decode") {
+  if (! -t STDIN) {
+  #if (tell(STDIN) == -1) {
+    my $input = <>;
+    chomp $input;
+    $input =~ s/%([A-Za-z0-9]{2})/chr(hex($1))/seg;
+    printf "%s\n", $input;
+    exit $ERRORS{OK};
+  } else {
+    if (exists $commandline{name}) {
+      my $input = $commandline{name};
+      $input =~ s/%([A-Za-z0-9]{2})/chr(hex($1))/seg;
+      printf "%s\n", $input;
+      exit $ERRORS{OK};
+    } else {
+      printf "i can't find your encoded statement. use --name or pipe it in my stdin\n";
+      exit $ERRORS{UNKNOWN};
+    }
+  }
 }
 
 if (exists $commandline{3}) {
@@ -441,6 +492,12 @@ if (exists $commandline{calcmeth}) {
   }
 } else {
   $commandline{calcmeth} = "classic";
+}
+
+if (exists $commandline{labelformat}) {
+  # groundwork
+} else {
+  $commandline{labelformat} = "pnp4nagios";
 }
 
 if (exists $commandline{'with-mymodules-dyn-dir'}) {
@@ -504,17 +561,24 @@ if ($needs_restart) {
         push(@newargv, sprintf "--%s", $option);
         push(@newargv, sprintf "%s", $commandline{$option});
       }
+    } elsif (grep { /^$option/ && /:/ } @params) {
+      if ($commandline{$option}) {
+        push(@newargv, sprintf "--%s", $option);
+        push(@newargv, sprintf "%s", $commandline{$option});
+      } else {
+        push(@newargv, sprintf "--%s", $option);
+      }
     } else {
       push(@newargv, sprintf "--%s", $option);
     }
   }
   if ($runas && ($> == 0)) {
     # this was not my idea. some people connect as root to their nagios clients.
-    exec "su", "-c", sprintf("%s %s", $0, join(" ", @newargv)), "-", $runas;
+    exec "su", "-c", sprintf("%s %s", $DBD::Oracle::Server::pluginpath, join(" ", @newargv)), "-", $runas;
   } elsif ($runas) {
-    exec "sudo", "-S", "-u", $runas, $0, @newargv;
+    exec "sudo", "-S", "-u", $runas, $DBD::Oracle::Server::pluginpath, @newargv;
   } else {
-    exec $0, @newargv;  
+    exec $DBD::Oracle::Server::pluginpath, @newargv;  
     # this makes sure that even a SHLIB or LD_LIBRARY_PATH are set correctly
     # when the perl interpreter starts. Setting them during runtime does not
     # help loading e.g. libclntsh.so
@@ -554,10 +618,34 @@ if (exists $commandline{name}) {
   } 
 }
 
-$SIG{'ALRM'} = sub {
-  printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
-  exit $ERRORS{UNKNOWN};
-};
+my $now = time;
+#$SIG{'ALRM'} = sub {
+#  printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
+#  exit $ERRORS{UNKNOWN};
+#};
+use POSIX ':signal_h';
+if ($^O =~ /MSWin/) {
+  local $SIG{'ALRM'} = sub {
+    printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
+    exit $ERRORS{UNKNOWN};
+  };
+} else {
+  my $mask = POSIX::SigSet->new(SIGALRM);
+  my $action = POSIX::SigAction->new(
+    sub { 
+      printf "UNKNOWN - %s timed out after %d seconds\n", $PROGNAME, $TIMEOUT;
+      #if ($^O =~ /linux/) {
+      #  open(KILL, "/bin/ps -o pid --no-headers --ppid $$|");
+      #  while (<KILL>) {
+      #    printf "kill %s\n", $_;
+      #  }
+      #  close KILL;
+      #}
+      exit $ERRORS{UNKNOWN};
+    }, $mask);
+  my $old_action = POSIX::SigAction->new();
+  sigaction(SIGALRM, $action, $old_action);
+}
 alarm($TIMEOUT);
 
 my $nagios_level = $ERRORS{UNKNOWN};
@@ -611,6 +699,10 @@ my %params = (
     tablespace => $commandline{tablespace},
     datafile => $commandline{datafile},
     basis => $commandline{basis},
+    offlineok => $commandline{offlineok},
+    mitigation => $commandline{mitigation},
+    notemp => $commandline{notemp},
+    noreadonly => $commandline{noreadonly},
     selectname => $commandline{name} || $commandline{tablespace} || $commandline{datafile},
     regexp => $commandline{regexp},
     name => $commandline{name},
@@ -623,6 +715,9 @@ my %params = (
     report => $commandline{report},
     commit => $commandline{commit},
     calcmeth => $commandline{calcmeth},
+    labelformat => $commandline{labelformat},
+    uniquelabels => $commandline{uniquelabels},
+    negate => $commandline{negate},
 );
 
 my $server = undef;
@@ -634,7 +729,7 @@ $nagios_message = $server->{nagios_message};
 $nagios_level = $server->{nagios_level};
 $perfdata = $server->{perfdata};
 
-printf "%s - %s", $ERRORCODES{$nagios_level}, $nagios_message;
-printf " | %s", $perfdata if $perfdata;
+printf "%s - %s", $ERRORCODES{$nagios_level}, $nagios_message if ! exists $server->{nagios}->{nomessages}->{$nagios_level};
+printf " | %s", $perfdata if $perfdata && ! $commandline{noperfdata};
 printf "\n";
 exit $nagios_level;

@@ -4,6 +4,7 @@ use strict;
 use Time::HiRes;
 use IO::File;
 use File::Copy 'cp';
+use File::Basename;
 use Sys::Hostname;
 use Data::Dumper;
 
@@ -11,6 +12,8 @@ my %ERRORS=( OK => 0, WARNING => 1, CRITICAL => 2, UNKNOWN => 3 );
 my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
 
 {
+  our $pluginpath = $ENV{'NAGIOS_PLUGIN'} || $0;
+  our $pluginname = basename($pluginpath);
   our $verbose = 0;
   our $scream = 0; # scream if something is not implemented
   our $access = "dbi"; # how do we access the database. 
@@ -37,6 +40,7 @@ sub new {
   my $class = shift;
   my %params = @_;
   my $self = {
+    mode => $params{mode},
     access => $params{method} || "dbi",
     connect => $params{connect},
     username => $params{username},
@@ -48,6 +52,9 @@ sub new {
     ident => $params{ident},
     report => $params{report},
     commit => $params{commit},
+    negate => $params{negate},
+    labelformat => $params{labelformat},
+    uniquelabels => $params{uniquelabels},
     version => 'unknown',
     instance => undef,
     database => undef,
@@ -56,6 +63,7 @@ sub new {
   bless $self, $class;
   $self->init_nagios();
   if ($self->dbconnect(%params)) {
+    DBD::Oracle::Server::add_server($self);
     $self->{version} = $self->{handle}->fetchrow_array(
         q{ SELECT version FROM v$instance });
     if (! $self->{version}) {
@@ -68,32 +76,59 @@ sub new {
       # much more cheaper.
       $self->{version} = $self->{handle}->fetchrow_array(
           q{ SELECT version FROM product_component_version 
-               WHERE product LIKE '%Server%' });
+               WHERE product LIKE '%Server%' OR
+                     product LIKE 'Oracle Database%Enterprise Edition%' });
       $self->{os} = 'Unix';
       $self->{dbuser} = $self->{username};
       $self->{thread} = 1;
       $self->{parallel} = 'no';
     } else {
-      ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel}, $self->{instance_name}, $self->{database_name}) = $self->{handle}->fetchrow_array(
-          q{ select dbms_utility.port_string,sys_context('userenv', 'session_user'),i.thread#,i.parallel, i.instance_name, d.name FROM dual, v$instance i, v$database d });
-      #$self->{os} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT dbms_utility.port_string FROM dual });
-      #$self->{dbuser} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT sys_context('userenv', 'session_user') FROM dual });
-      #$self->{thread} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT thread# FROM v$instance });
-      #$self->{parallel} = $self->{handle}->fetchrow_array(
-      #    q{ SELECT parallel FROM v$instance });
+      if ($self->version_is_minimum('10')) {
+        ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel},
+            $self->{instance_name}, $self->{database_name},
+            $self->{global_name}, $self->{host_name}) = $self->{handle}->fetchrow_array(q{
+            SELECT
+                d.platform_name,
+                sys_context('userenv', 'session_user'),
+                i.thread#,
+                i.parallel,
+                i.instance_name,
+                d.name,
+                g.global_name,
+                i.host_name
+            FROM
+                dual,
+                v$instance i,
+                v$database d,
+                global_name g
+        });
+      } else {
+        ($self->{os}, $self->{dbuser}, $self->{thread}, $self->{parallel},
+            $self->{instance_name}, $self->{database_name},
+            $self->{global_name}, $self->{host_name}) = $self->{handle}->fetchrow_array(q{
+            SELECT
+                dbms_utility.port_string,
+                sys_context('userenv', 'session_user'),
+                i.thread#,
+                i.parallel,
+                i.instance_name,
+                d.name,
+                g.global_name,
+                i.host_name
+            FROM
+                dual,
+                v$instance i,
+                v$database d,
+                global_name g
+        });
+      }
       if ($self->{ident}) {
-        #$self->{instance_name} = $self->{handle}->fetchrow_array(
-        #    q{ SELECT instance_name FROM v$instance });
-        #$self->{database_name} = $self->{handle}->fetchrow_array(
-        #    q{ SELECT name FROM v$database });
         $self->{identstring} = sprintf "(host: %s inst: %s, db: %s) ",
-            hostname(), $self->{instance_name}, $self->{database_name};
+            $self->{host_name}, $self->{instance_name}, 
+            ($self->{global_name} && $self->{global_name} =~ /\./) ?
+                $self->{global_name} : $self->{database_name};
       }
     }
-    DBD::Oracle::Server::add_server($self);
     $self->init(%params);
   }
   return $self;
@@ -254,15 +289,24 @@ sub nagios {
           }
         }
       } else {
+        my $label = $params{name2};
+        my $showvalue = 1;
+        if (substr($label, 0, 1) eq ":") {
+          # --name "select status from backup" --name2 ":backup status"
+          # sometimes the numerical returncode is not relevant
+          $label = substr($label, 1);
+          $showvalue = 0;
+        }
         $self->add_nagios(
             # the first item in the list will trigger the threshold values
             $self->check_thresholds($self->{genericsql}[0], 1, 5),
-                sprintf "%s: %s%s",
-                $params{name2} ? lc $params{name2} : lc $params{selectname},
+                sprintf "%s%s %s%s",
+                $label ? lc $label : lc $params{selectname},
+                $showvalue ? ":" : "",
                 # float as float, integers as integers
-                join(" ", map {
+                $showvalue ? join(" ", map {
                     (sprintf("%d", $_) eq $_) ? $_ : sprintf("%f", $_)
-                } @{$self->{genericsql}}),
+                } @{$self->{genericsql}}) : "",
                 $params{units} ? $params{units} : "");
         my $i = 0;
         # workaround... getting the column names from the database would be nicer
@@ -300,6 +344,7 @@ sub init_nagios {
         2 => [],
         3 => [],
       },
+      nomessages => {},
       perfdata => [],
     };
     $$nagioslevelvar = $ERRORS{OK},
@@ -311,6 +356,7 @@ sub init_nagios {
         2 => [],
         3 => [],
       },
+      nomessages => {},
       perfdata => [],
     };
     $self->{nagios_level} = $ERRORS{OK},
@@ -327,22 +373,48 @@ sub check_thresholds {
       $self->{warningrange} : $defaultwarningrange;
   $self->{criticalrange} = defined $self->{criticalrange} ?
       $self->{criticalrange} : $defaultcriticalrange;
-  if ($self->{warningrange} !~ /:/ ) {
-	# warning = 10, warn if > 10
-    $level = $ERRORS{WARNING} if $value > $self->{warningrange};
-  } elsif ($self->{warningrange} =~ /(\d+):/ ) {
-	# warning = 10:, warn if < 10
-    $self->{warningrange} =~ /(\d+):/;
-    $level = $ERRORS{WARNING} if $value < $1;
-  } 
 
-  if ($self->{criticalrange} !~ /:/) {
-	# critical = 20, warn if > 20
-    $level = $ERRORS{CRITICAL} if $value > $self->{criticalrange};
-  } elsif ($self->{criticalrange} =~ /(\d+):/) {
-	# critical = 20: crit if < 20
-    $self->{criticalrange} =~ /(\d+):/;
-    $level = $ERRORS{CRITICAL} if $value < $1;
+  if ($self->{warningrange} =~ /^([-+]?[0-9]*\.?[0-9]+)$/) {
+    # warning = 10, warn if > 10 or < 0
+    $level = $ERRORS{WARNING}
+        if ($value > $1 || $value < 0);
+  } elsif ($self->{warningrange} =~ /^([-+]?[0-9]*\.?[0-9]+):$/) {
+    # warning = 10:, warn if < 10
+    $level = $ERRORS{WARNING}
+        if ($value < $1);
+  } elsif ($self->{warningrange} =~ /^~:([-+]?[0-9]*\.?[0-9]+)$/) {
+    # warning = ~:10, warn if > 10
+    $level = $ERRORS{WARNING}
+        if ($value > $1);
+  } elsif ($self->{warningrange} =~ /^([-+]?[0-9]*\.?[0-9]+):([-+]?[0-9]*\.?[0-9]+)$/) {
+    # warning = 10:20, warn if < 10 or > 20
+    $level = $ERRORS{WARNING}
+        if ($value < $1 || $value > $2);
+  } elsif ($self->{warningrange} =~ /^@([-+]?[0-9]*\.?[0-9]+):([-+]?[0-9]*\.?[0-9]+)$/) {
+    # warning = @10:20, warn if >= 10 and <= 20
+    $level = $ERRORS{WARNING}
+        if ($value >= $1 && $value <= $2);
+  }
+  if ($self->{criticalrange} =~ /^([-+]?[0-9]*\.?[0-9]+)$/) {
+    # critical = 10, crit if > 10 or < 0
+    $level = $ERRORS{CRITICAL}
+        if ($value > $1 || $value < 0);
+  } elsif ($self->{criticalrange} =~ /^([-+]?[0-9]*\.?[0-9]+):$/) {
+    # critical = 10:, crit if < 10
+    $level = $ERRORS{CRITICAL}
+        if ($value < $1);
+  } elsif ($self->{criticalrange} =~ /^~:([-+]?[0-9]*\.?[0-9]+)$/) {
+    # critical = ~:10, crit if > 10
+    $level = $ERRORS{CRITICAL}
+        if ($value > $1);
+  } elsif ($self->{criticalrange} =~ /^([-+]?[0-9]*\.?[0-9]+):([-+]?[0-9]*\.?[0-9]+)$/) {
+    # critical = 10:20, crit if < 10 or > 20
+    $level = $ERRORS{CRITICAL}
+        if ($value < $1 || $value > $2);
+  } elsif ($self->{criticalrange} =~ /^@([-+]?[0-9]*\.?[0-9]+):([-+]?[0-9]*\.?[0-9]+)$/) {
+    # critical = @10:20, crit if >= 10 and <= 20
+    $level = $ERRORS{CRITICAL}
+        if ($value >= $1 && $value <= $2);
   }
   return $level;
   #
@@ -356,11 +428,17 @@ sub add_nagios {
   my $message = shift;
   push(@{$self->{nagios}->{messages}->{$level}}, $message);
   # recalc current level
-  foreach my $llevel qw(CRITICAL WARNING UNKNOWN OK) {
+  foreach my $llevel (qw(CRITICAL WARNING UNKNOWN OK)) {
     if (scalar(@{$self->{nagios}->{messages}->{$ERRORS{$llevel}}})) {
       $self->{nagios_level} = $ERRORS{$llevel};
     }
   }
+}
+
+sub supress_nagios {
+  my $self = shift;
+  my $level = shift;
+  $self->{nagios}->{nomessages}->{$level} = 1;
 }
 
 sub add_nagios_ok {
@@ -399,6 +477,9 @@ sub merge_nagios {
   foreach my $level (0..3) {
     foreach (@{$child->{nagios}->{messages}->{$level}}) {
       $self->add_nagios($level, $_);
+      if (exists $child->{nagios}->{nomessages}->{$level}) {
+        $self->{nagios}->{nomessages}->{$level} = 1;
+      }
     }
     #push(@{$self->{nagios}->{messages}->{$level}},
     #    @{$child->{nagios}->{messages}->{$level}});
@@ -409,6 +490,7 @@ sub merge_nagios {
 
 sub calculate_result {
   my $self = shift;
+  my $labels = shift || {};
   my $multiline = 0;
   map {
     $self->{nagios_level} = $ERRORS{$_} if 
@@ -428,7 +510,18 @@ sub calculate_result {
   } grep {
       scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
   } ("CRITICAL", "WARNING", "UNKNOWN"));
+  my $good_messages = join(($multiline ? "\n" : ", "), map {
+      join(($multiline ? "\n" : ", "), @{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } grep {
+      scalar(@{$self->{nagios}->{messages}->{$ERRORS{$_}}})
+  } ("OK"));
   my $all_messages_short = $bad_messages ? $bad_messages : 'no problems';
+  # if mode = my-....
+  # and there are some ok-messages
+  # output them instead of "no problems"
+  if ($self->{mode} =~ /^my\:\:/ && $good_messages) {
+    $all_messages_short = $bad_messages ? $bad_messages : $good_messages;
+  }
   my $all_messages_html = "<table style=\"border-collapse: collapse;\">".
       join("", map {
           my $level = $_;
@@ -450,7 +543,33 @@ sub calculate_result {
   } elsif ($self->{report} eq "html") {
     $self->{nagios_message} .= $all_messages_short."\n".$all_messages_html;
   }
-  $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
+  foreach my $from (keys %{$self->{negate}}) {
+    if ((uc $from) =~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/ &&
+        (uc $self->{negate}->{$from}) =~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/) {
+      if ($self->{nagios_level} == $ERRORS{uc $from}) {
+        $self->{nagios_level} = $ERRORS{uc $self->{negate}->{$from}};
+      }
+    }
+  }
+  if ($self->{labelformat} eq "pnp4nagios") {
+    $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
+  } else {
+    $self->{perfdata} = join(" ", map {
+        my $perfdata = $_;
+        if ($perfdata =~ /^(.*?)=(.*)/) {
+          my $label = $1;
+          my $data = $2;
+          if (exists $labels->{$label} &&
+              exists $labels->{$label}->{$self->{labelformat}}) {
+            $labels->{$label}->{$self->{labelformat}}."=".$data;
+          } else {
+            $perfdata;
+          }
+        } else {
+          $perfdata;
+        }
+    } @{$self->{nagios}->{perfdata}});
+  }
 }
 
 sub set_global_db_thresholds {
@@ -579,6 +698,16 @@ sub dbconnect {
     $retval = $self->{handle};
   }
   $self->{tac} = Time::HiRes::time();
+  # the Connection-object had it's own signal handler. Restore the old one
+  # and set a new timeout
+  if ($^O =~ /MSWin/) {
+    # has been localized, no restore necessary
+  } else {
+    use POSIX ':signal_h';
+    my $mask = POSIX::SigSet->new(SIGALRM);
+    POSIX::sigaction(SIGALRM, $self->{handle}->{old_action});
+  }
+  alarm($self->{timeout} - ($self->{tac} - $self->{tic}));
   return $retval;
 }
 
@@ -619,6 +748,43 @@ sub DESTROY {
   #$self->trace(sprintf "DESTROY %s exit with handle %s %s", ref($self), $handle1, $handle2);
   if (ref($self) eq "DBD::Oracle::Server") {
     #printf "humpftata\n";
+  }
+}
+
+# $self->protect_value(\%params, 'cpu_busy', 'cpu_busy', 'percent');
+sub protect_value {
+  my $self = shift;
+  my $pparams = shift;
+  my %params = %{$pparams};
+  my $ident = shift;
+  my $key = shift;
+  my $validfunc = shift;
+  if (ref($validfunc) ne "CODE" && $validfunc eq "percent") {
+    $validfunc = sub {
+      my $value = shift;
+      return ($value < 0 || $value > 100) ? 0 : 1;
+    }
+  }
+  if (&$validfunc($self->{$key})) {
+    $self->save_state(%params, (name => 'protect_'.$ident.'_'.$key, save => {
+        $key => $self->{$key},
+        exception => 0,
+    }));
+  } else {
+    # if the device gives us an clearly wrong value, simply use the last value.
+    my $laststate = $self->load_state(%params, (name => 'protect_'.$ident.'_'.$key));
+    $self->debug(sprintf "self->{%s} is %s and invalid for the %dth time",
+        $key, $self->{$key}, $laststate->{exception} + 1);
+    if ($laststate->{exception} < 4) {
+      # but only 5 times.
+      # if the error persists, somebody has to check the device.
+      $self->{$key} = $laststate->{$key};
+    }
+    $laststate->{exception}++;
+    $self->save_state(%params, (name => 'protect_'.$ident.'_'.$key, save => {
+        $key => $self->{$key},
+        exception => $laststate->{exception},
+    }));
   }
 }
 
@@ -923,6 +1089,11 @@ sub init {
         }
         $self->{username} = '/';
         $self->{password} = "";
+      } elsif ($self->{username} && $self->{username} =~ /^\/@([\w\-\._]+)/) {
+        $self->{username} = "";
+        $self->{password} = "";
+        $self->{sid} = $1;
+        $self->{connect} = $1;
       } else {
         $self->{errstr} = "Please specify database, username and password";
         return undef;
@@ -938,27 +1109,42 @@ sub init {
       use POSIX ':signal_h';
       if ($^O =~ /MSWin/) {
         local $SIG{'ALRM'} = sub {
-          die "alarm\n";
+          die "timeout alarm\n";
         };
       } else {
-        my $mask = POSIX::SigSet->new( SIGALRM );
-        my $action = POSIX::SigAction->new(
-            sub { die "alarm\n" ; }, $mask);
-        my $oldaction = POSIX::SigAction->new();
-        sigaction(SIGALRM ,$action ,$oldaction );
+        POSIX::setpgid(0, 0);
+        my $alrm_mask = POSIX::SigSet->new(SIGALRM);
+        my $term_mask = POSIX::SigSet->new(SIGTERM);
+        my $alrm_action = POSIX::SigAction->new(
+            sub {
+                die "timeout alarm\n";
+            }, $alrm_mask);
+        my $term_action = POSIX::SigAction->new(
+            sub {
+                if (1) {
+                  printf "CRITICAL - received TERM signal\n";
+                  kill 9, 0;
+                } else {
+                  die "sigterm\n" ;      
+                }
+            }, $term_mask);
+        $self->{old_action} = POSIX::SigAction->new();
+        POSIX::sigaction(SIGALRM, $alrm_action, $self->{old_action});
+        POSIX::sigaction(SIGTERM, $term_action);
       }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
       my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
-      if ($self->{username} eq "sys" || $self->{username} eq "sysdba") {
+      my $username = $self->{username};
+      if ($self->{username} eq "sys" || $self->{username} eq "sysdba" || $self->{username} eq "asmsnmp") {
         $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
-              #ora_session_mode => DBD::Oracle::ORA_SYSDBA   
-              ora_session_mode => 0x0002  };
+              ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA
         $dsn = sprintf "DBI:Oracle:";
+        $username = '';
       }
       if ($self->{handle} = DBI->connect(
           $dsn,
-          $self->{username},
+          $username,
           $self->{password},
           $connecthash)) {
         $self->{handle}->do(q{
@@ -1151,21 +1337,38 @@ sub init {
   my $retval = undef;
   $self->{loginstring} = "traditional";
   my $template = $self->{mode}.'XXXXX';
-  my $now = time;
   if ($^O =~ /MSWin/) {
-    $template =~ s/::/_/g;
-    # This is no longer necessary. (Explanation in fetchrow_array "best practice".
-    # But maybe we have crap files for whatever reason.
-    my $pattern = $template;
-    $pattern =~ s/XXXXX$//g;
-    foreach (glob $self->system_tmpdir().'/'.$pattern.'*') {
-      if (/\.(sql|out|err)$/) {
-        if (($now - (stat $_)[9]) > 300) {
-          unlink $_;
-        }
+    $template =~ s/:/_/g; # mode contains ":", which is not good in windows path names
+  }
+  my $now = time;
+  if (1) {
+    # Maybe we have crap files for whatever reason.
+    no warnings "all";
+    foreach (glob $self->system_tmpdir().'/'.$self->{mode}.'?????.*') {
+      if (/\.(sql|out|err|temp)$/) {
+        eval {
+          if (($now - (stat $_)[9]) > 300) {
+            unlink $_;
+          }
+        };
       }
     }
   }
+  use POSIX ':signal_h';
+  if ($^O =~ /MSWin/) {
+    local $SIG{'ALRM'} = sub {
+      die "timeout alarm\n";
+    };
+  } else {
+    my $mask = POSIX::SigSet->new(SIGALRM);
+    my $action = POSIX::SigAction->new(
+        sub { die "timeout alarm\n" ; }, $mask);
+    my $old_action = POSIX::SigAction->new();
+    $self->{old_action} = $old_action;
+    sigaction(SIGALRM, $action, $old_action);
+  }
+  alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
+  
   eval {
     my ($tempfile_handle, $tempfile) =
         tempfile($template, SUFFIX => ".temp", UNLINK => 1,
@@ -1189,7 +1392,7 @@ sub init {
     }
   } else {
     if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)/) {
+        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)(:(\d+))*(\/([\w\-\._]+))*/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
       $self->{username} = $1;
@@ -1199,7 +1402,14 @@ sub init {
         delete $ENV{TWO_TASK};
         $self->{loginstring} = "sys";
       } else {
-        $self->{loginstring} = "traditional";
+        if ($7) {
+          $self->{dbhost} = $3;
+          $self->{dbport} = $5 || 1521;
+          $self->{dbservice} = $7;
+          $self->{loginstring} = "easyconnect";
+        } else {
+          $self->{loginstring} = "traditional";
+        }
       }
     } elsif ($self->{connect} && ! $self->{username} && ! $self->{password} &&
         $self->{connect} =~ /sysdba@([\w\-\._]+)/) {
@@ -1225,7 +1435,7 @@ sub init {
         $self->{username} =~ /^\/@([\w\-\._]+)/) {
       # --user /@ubba1
       $self->{username} = $1;
-      $self->{sid} = $self->{connect};
+      $self->{sid} = $self->{username};
       $self->{loginstring} = "passwordstore";
     } elsif ($self->{connect} && $self->{username} && ! $self->{password} &&
         $self->{username} eq "sysdba") {
@@ -1237,7 +1447,12 @@ sub init {
     } elsif ($self->{connect} && $self->{username} && $self->{password}) {
       # --connect bba --username nagios --password oradbmon
       $self->{sid} = $self->{connect};
-      $self->{loginstring} = "traditional";
+      if ($self->{username} eq "sys") {
+        delete $ENV{TWO_TASK};
+        $self->{loginstring} = "sys";
+      } else {
+        $self->{loginstring} = "traditional";
+      }
     } else {
       $self->{errstr} = "Please specify database, username and password";
       return undef;
@@ -1329,7 +1544,7 @@ sub init {
       }
       if ($self->{mode} =~ /^server::tnsping/) {
         if ($self->{loginstring} eq "traditional") {
-          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" < /dev/null",
+          $self->{sqlplus} = sprintf "%s -S '%s/%s@%s' < /dev/null",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid};
         } elsif ($self->{loginstring} eq "extauth") {
@@ -1343,7 +1558,7 @@ sub init {
           $self->{sqlplus} = sprintf "%s -S / as sysdba < /dev/null",
               $sqlplus;
         } elsif ($self->{loginstring} eq "sys") {
-          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" as sysdba < /dev/null",
+          $self->{sqlplus} = sprintf "%s -S '%s/%s@%s' as sysdba < /dev/null",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid};
         }
@@ -1353,9 +1568,14 @@ sub init {
         }
       } else {
         if ($self->{loginstring} eq "traditional") {
-          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" < %s > %s",
+          $self->{sqlplus} = sprintf "%s -S '%s/%s@%s' < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
+              $self->{sql_commandfile}, $self->{sql_outfile};
+        } elsif ($self->{loginstring} eq "easyconnect") {
+          $self->{sqlplus} = sprintf "%s -S '%s/%s@%s:%d/%s' < %s > %s",
+              $sqlplus,
+              $self->{username}, $self->{password}, $self->{dbhost}, $self->{dbport}, $self->{dbservice},
               $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "extauth") {
           $self->{sqlplus} = sprintf "%s -S / < %s > %s",
@@ -1371,26 +1591,12 @@ sub init {
               $sqlplus,
               $self->{sql_commandfile}, $self->{sql_outfile};
         } elsif ($self->{loginstring} eq "sys") {
-          $self->{sqlplus} = sprintf "%s -S \"%s/%s@%s\" as sysdba < %s > %s",
+          $self->{sqlplus} = sprintf "%s -S '%s/%s@%s' as sysdba < %s > %s",
               $sqlplus,
               $self->{username}, $self->{password}, $self->{sid},
               $self->{sql_commandfile}, $self->{sql_outfile};
         }
       }
-  
-      use POSIX ':signal_h';
-      if ($^O =~ /MSWin/) {
-        local $SIG{'ALRM'} = sub {
-          die "alarm\n";
-        };
-      } else {
-        my $mask = POSIX::SigSet->new( SIGALRM );
-        my $action = POSIX::SigAction->new(
-            sub { die "alarm\n" ; }, $mask);
-        my $oldaction = POSIX::SigAction->new();
-        sigaction(SIGALRM ,$action ,$oldaction );
-      }
-      alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
   
       if ($self->{mode} =~ /^server::tnsping/) {
         if ($tnsping) {
@@ -1412,7 +1618,7 @@ sub init {
             printf STDERR "ping exit bumm \n";
           }
           $exit_output =~ s/\n//g;
-          $exit_output =~ s/at $0//g;
+          $exit_output =~ s/at $DBD::Oracle::Server::pluginpath//g;
           chomp $exit_output;
           die $exit_output;
         }
@@ -1453,6 +1659,7 @@ sub fetchrow_array {
       $sql =~ s/\?/'$_'/;
     }
   }
+  $sql =~ s/^\s*//g;
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
@@ -1464,26 +1671,43 @@ sub fetchrow_array {
   } else {
     # This so-called "best practice" leaves an open filehandle under windows
     # my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; <> };
-    my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
+    #my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
+    # ORA-28001 Password expired. sqlplus exits with 0, but no resultfile is written. Errors can be found in outfile.
+    my $output = do { 
+      local (@ARGV, $/) = -f $self->{sql_resultfile} ?
+          $self->{sql_resultfile} : $self->{sql_outfile};
+      my $x = <>; 
+      close ARGV;
+      $x 
+    };
     #
     # SELECT count(*) FROM blah
     #                 *
     # ERROR at line 1:
     # ORA-00942: table or view does not exist
     # --> if there is a single * AND ERROR AND ORA then we surely have en error
-    if ($output =~ /^\s+\*[ \*]*$/m && 
+    if (($output =~ /^[ \*]+$/m && 
         $output =~ /^ERROR/m &&
-        $output =~/^ORA\-/m) {
+        $output =~/^ORA\-/m) || ($output =~ /^ORA-28001/m)) {
       my @oerrs = map {
         /(ORA\-\d+:.*)/ ? $1 : ();
       } split(/\n/, $output);
       $self->{errstr} = join(" ", @oerrs);
     } else {
       if ($output) {
+        my $stderrvar;
+        *SAVEERR = *STDERR;
+        open OUT ,'>',\$stderrvar;
+        *STDERR = *OUT;
         @row = map { convert($_) }
             map { s/^\s+([\.\d]+)$/$1/g; $_ }         # strip leading space from numbers
             map { s/\s+$//g; $_ }                     # strip trailing space
             split(/\|/, (split(/\n/, $output))[0]);
+        *STDERR = *SAVEERR;
+        if ($stderrvar) {
+          $self->trace(sprintf "something bad happened: %s", $stderrvar);
+          $self->{errstr} = $stderrvar;
+        }
       }
     }
   }
@@ -1517,7 +1741,7 @@ sub fetchall_array {
       $sql =~ s/\?/'$_'/;
     }
   }
-
+  $sql =~ s/^\s*//g;
   $self->create_commandfile($sql);
   my $exit_output = `$self->{sqlplus}`;
   if ($?) {
@@ -1529,16 +1753,27 @@ sub fetchall_array {
     $self->{errstr} = join(" ", @oerrs).' '.$exit_output;
   } else {
     my $output = do { local (@ARGV, $/) = $self->{sql_resultfile}; my $x = <>; close ARGV; $x };
-    my @rows = map { [ 
-        map { convert($_) } 
-        map { s/^\s+([\.\d]+)$/$1/g; $_ }
-        map { s/\s+$//g; $_ }
-        split /\|/
-    ] } grep { ! /^\d+ rows selected/ } 
-        grep { ! /^\d+ [Zz]eilen ausgew / }
-        grep { ! /^Elapsed: / }
-        grep { ! /^\s*$/ } split(/\n/, $output);
-    $rows = \@rows;
+    if ($output =~ /^\s+\*[ \*]*$/m && 
+        $output =~ /^ERROR/m &&
+        $output =~/^ORA\-/m) {
+      my @oerrs = map {
+        /(ORA\-\d+:.*)/ ? $1 : ();
+      } split(/\n/, $output);
+      $self->{errstr} = join(" ", @oerrs);
+      $rows = [];
+      printf STDERR "%s\n", $self->{errstr};
+    } else {
+      my @rows = map { [ 
+          map { convert($_) } 
+          map { s/^\s+([\.\d]+)$/$1/g; $_ }
+          map { s/\s+$//g; $_ }
+          split /\|/
+      ] } grep { ! /^\d+ rows selected/ } 
+          grep { ! /^\d+ [Zz]eilen ausgew / }
+          grep { ! /^Elapsed: / }
+          grep { ! /^\s*$/ } split(/\n/, $output);
+      $rows = \@rows;
+    }
   }
   if ($@) {
     $self->debug(sprintf "bumm %s", $@);
@@ -1584,24 +1819,39 @@ sub convert {
 sub execute {
   my $self = shift;
   my $sql = shift;
-  eval {
-    my $sth = $self->{handle}->prepare($sql);
-    $sth->execute();
-  };
-  if ($@) {
-    printf STDERR "bumm %s\n", $@;
-  }
+  my @arguments = @_;
+  return $self->fetchrow_array($sql, @arguments);
 }
 
 sub DESTROY {
   my $self = shift;
+  my $plugin_exit = $?;
   $self->trace("try to clean up command and result files");
+  if ($^O =~ /linux/) {
+    my $pgrp = getpgrp();
+    open(KILL, "/bin/ps -o pid,pgid,cmd --no-headers|");
+    while (<KILL>) {
+      if (/^(\d+)\s+(\d+).*sqlplus.*/) {
+        if ($2 == $$ && $1 != $$) {
+          kill 15, $1;
+        }
+        #printf "kill 9, %d\n", $1 if $2 == $$ && $1 != $$;
+        #kill 9, $1 if $2 == $$ && $1 != $$;
+      }
+    }
+    close KILL;
+  }
   unlink $self->{sql_commandfile}
       if $self->{sql_commandfile} && -f $self->{sql_commandfile};
   unlink $self->{sql_resultfile}
       if $self->{sql_resultfile} && -f $self->{sql_resultfile};
   unlink $self->{sql_outfile} if
       $self->{sql_outfile} && -f $self->{sql_outfile};
+  unlink $ENV{HOME}."/sqlnet.log" if -f $ENV{HOME}."/sqlnet.log";
+  # der war fies. destruktor laeuft nach dem abschliessenden exit(nagios_exit)
+  # und das kill/ps-zeugs vermurkst den exitcode bzw setzt ihn immer auf 0
+  # kam zum vorschein bei my-modulen
+  $? = $plugin_exit;
 }
 
 sub create_commandfile {
@@ -1689,14 +1939,15 @@ sub init {
       use POSIX ':signal_h';
       if ($^O =~ /MSWin/) {
         local $SIG{'ALRM'} = sub {
-          die "alarm\n";
+          die "timeout alarm\n";
         };
       } else {
-        my $mask = POSIX::SigSet->new( SIGALRM );
+        my $mask = POSIX::SigSet->new(SIGALRM);
         my $action = POSIX::SigAction->new(
-            sub { die "alarm\n" ; }, $mask);
-        my $oldaction = POSIX::SigAction->new();
-        sigaction(SIGALRM ,$action ,$oldaction );
+            sub { die "timeout alarm\n" ; }, $mask);
+        my $old_action = POSIX::SigAction->new();
+        $self->{old_action} = $old_action;
+        sigaction(SIGALRM, $action, $old_action);
       }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       if ($self->{handle} = DBI->connect(

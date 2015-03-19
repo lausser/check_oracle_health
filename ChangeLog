@@ -2,6 +2,142 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.7 - 2015-03-09
+- add --uniquelabels for datafiles with identical names (used in io-traffic)
+
+1.9.4.6 - 2015-02-20
+- bugfix in --ident
+
+1.9.4.5 - 2014-12-01
+- bugfix in method sqlplus for special characters in passwords
+
+1.9.4.4 - 2014-11-17
+- switch off -epn again (observed problems in even rarer cases)
+
+1.9.4.3 - 2014-11-13
+- make the plugin more epn-safe
+
+1.9.4.2 - 2014-11-11
+- bugfix in initial handshake, remove an undef split
+
+1.9.4.1 - 2014-10-27
+- switch off -epn again (observed problems in rare cases)
+
+1.9.4 - 2014-05-18
+- enable wallets for the dbi method (Thanks Tommi)
+- bugfix in initial handshake and 9.x
+- bugfix in invalid/dba_ind_subpartitions and 9.x
+- --noperfdata suppresses perfdata
+
+1.9.3.7 - 2014-04-06
+- switch on +epn
+
+1.9.3.6 - 2014-04-04
+- bugfix in method sqlplus. handle expired passwords 
+
+1.9.3.5 - 2014-04-01
+- remove leftover sqlnet.log files
+- implement --negate old_level=new_level
+- output also ok-messages for my-modes
+
+1.9.3.4 - 2014-03-18
+- allow floating point numbers in thresholds
+
+1.9.3.3 - 2014-03-17
+- bugfix in diskgroups
+- bugfix in ora-error-handling
+
+1.9.3.2 - 2014-01-27
+- bugfix in a tmp-file-cleanup-routine (only --method sqlplus and many concurrent checks)
+
+1.9.3.1 - 2014-01-14
+- show ORA-errors in stderr (results in warning) coming from sqlplus
+
+1.9.3 - 2014-01-13
+- added subpartitions to invalid-objects
+
+1.9.2.1 - 2014-01-09
+- bugfix in sga-library-cache-pinhit-ratio (Thanks Michel van der Voort)
+
+1.9.2 - 2013-12-18
+- show detailed output for mode corrupted-blocks and report html
+- protect sga-data-buffer-hit-ratio against non-plausible values
+- add modes list-asm-diskgroups and asm-diskgroup-usage/free (Thanks Oliver Skibbe!)
+
+1.9.1.1 - 2013-12-17
+- bugfix in connection destructor
+
+1.9.1 - 2013-12-13
+- bugfix in tablespace-free (datafile in status recovery leads to undef error)
+
+1.9 - 2013-12-09
+- rewrite of the timeout handling
+- bugfix for the windows version
+
+1.8.4.3 - 2013-10-16
+- bugfix in sqlplus fetchrow_array, handles empty result set
+
+1.8.4.2 - 2013-10-16
+- bugfix in invalid objects for oracle < 10.x
+
+1.8.4.1 - 2013-10-09
+- show a subset of perfata with --name2 and invalid-objects
+
+1.8.4 - 2013-10-04
+- invalid-objects can be selected with --name/name2
+
+1.8.3 - 2013-09-30
+- show detailed output for mode invalid-objects and report html
+
+1.8.2.1 - 2013-
+- bugfix in --name :...
+
+1.8.2 - 2013-08-20
+- enable easy connect syntax with --method sqlplus
+
+1.8.1.2 - 2013-07-26
+- --mode sql --name2 ":<label>" suppresses the output of the numerical result
+
+1.8.1.1 - 2013-07-04
+- invalid-objects takes refresh delay (default: 2 days) into account. Thanks @chtyo)
+
+1.8.1 - 2013-07-02
+- mode sqlplus can execute stored procedures 
+
+1.8.0.1 - 2013-06-10
+- bugfix in sysdba-connect
+
+1.8 - 2013-06-04
+- Don Seiler implemented modes dataguard-lag and dataguard-mrp-status
+  A big thank to Don! Monitoring of Oracle Data Guard is now possible
+
+1.7.8.2 - 2013-04-26
+- fix a bug in the online help
+
+1.7.8.1 - 2013-04-09
+- cleanup leftover temp-files (written by method sqlplus)
+
+1.7.8 - 2013-03-27
+- added mode decode
+
+1.7.7.3 - 2013-02-21
+- bugfix in add_nagios, raising a deprecated-message in perl. (Thanks Philip Griesbacher)
+
+1.7.7.2 - 2013-01-22
+- optimized tablespace-can-allocate-next (Thanks Thomas Koerblein)
+
+1.7.7.1 - 2013-01-14
+- bugfix in sqlplus connect with a sys user
+
+1.7.7 - 2012-11-29
+- add parameter --mitigation and --notemp and --noreadonly
+
+1.7.6.1 - 2012-11-19
+- fix a bug with --extra-opts and --environ
+
+1.7.6 - 2012-11-10
+- implemented all sorts of thresholds (Thanks Simon Meggle)
+
 1.7.5.1
 - fix a bug in sga-library-cache-reloads (thresholds compared against pinhits) (Thanks claney)
 - fix a bug in calcmeth which only is visible with --environ (Thanks Pullistricker)
