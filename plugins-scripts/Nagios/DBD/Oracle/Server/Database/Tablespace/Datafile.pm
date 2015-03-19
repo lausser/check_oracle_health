@@ -176,8 +176,9 @@ sub nagios {
           $self->check_thresholds($self->{io_total_per_sec}, "1000", "5000"),
           sprintf ("%s: %.2f IO Operations per Second", 
               $self->{name}, $self->{io_total_per_sec}));
+      (my $path = $self->{path}) =~ s/:|\/|\\/_/g;
       $self->add_perfdata(sprintf "'dbf_%s_io_total_per_sec'=%.2f;%d;%d",
-          $params{uniquelabels} ? $self->{path} : $self->{name}, $self->{io_total_per_sec},
+          $params{uniquelabels} ? $path : $self->{name}, $self->{io_total_per_sec},
           $self->{warningrange}, $self->{criticalrange});
     }
   }
