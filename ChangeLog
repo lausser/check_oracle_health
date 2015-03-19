@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.8 - 2015-03-19
+- Convert ':/\' to '_' in --uniquelabels  (Thanks Simon Meggle)
+
 1.9.4.7 - 2015-03-09
 - add --uniquelabels for datafiles with identical names (used in io-traffic)
 
