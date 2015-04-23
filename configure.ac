@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT(check_oracle_health,1.9.4.9)
+AC_INIT(check_oracle_health,2.0)
 AM_INIT_AUTOMAKE([1.9 tar-pax])
 AM_MAINTAINER_MODE([disable])
 AC_CANONICAL_HOST

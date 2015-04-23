@@ -1007,6 +1007,16 @@ sub system_tmpdir {
   }
 }
 
+sub decode_password {
+  my $self = shift;
+  my $password = shift;
+  if ($password && $password =~ /^rfc3986:\/\/(.*)/) {
+    $password = $1;
+    $password =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+  }
+  return $password;
+}
+
 
 package DBD::Oracle::Server::Connection;
 
@@ -1145,7 +1155,7 @@ sub init {
       if ($self->{handle} = DBI->connect(
           $dsn,
           $username,
-          $self->{password},
+          $self->decode_password($self->{password}),
           $connecthash)) {
         $self->{handle}->do(q{
             ALTER SESSION SET NLS_NUMERIC_CHARACTERS=".," });
@@ -1459,6 +1469,7 @@ sub init {
     }
   }
   if (! exists $self->{errstr}) {
+    $self->{password} = $self->decode_password($self->{password});
     eval {
       $ENV{ORACLE_SID} = $self->{sid};
       if (! exists $ENV{ORACLE_HOME}) {
@@ -1874,6 +1885,20 @@ sub create_commandfile {
   close CMDCMD;
 }
 
+sub decode_password {
+  my $self = shift;
+  my $password = shift;
+  $password = $self->SUPER::decode_password($password);
+  # we call '...%s/%s@...' inside backticks where the second %s is the password
+  # abc'xcv -> ''abc'\''xcv''
+  # abc'`xcv -> ''abc'\''\`xcv''
+  if ($password =~ /'/) {
+    $password = "'".join("\\'", map { "'".$_."'"; } split("'", $password))."'";
+  }
+  return $password;
+}
+
+
 package DBD::Oracle::Server::Connection::Sqlrelay;
 
 use strict;
@@ -1952,7 +1977,7 @@ sub init {
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       if ($self->{handle} = DBI->connect(
           sprintf("DBI:SQLRelay:host=%s;port=%d;socket=%s", $self->{host}, $self->{port}, $self->{socket}),
-          $self->{username},
+          $self->decode_password($self->{username}),
           $self->{password},
           { RaiseError => 1, AutoCommit => $self->{commit}, PrintError => 1 })) {
         $self->{handle}->do(q{

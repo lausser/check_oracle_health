@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+2.0 - 2015-04-23
+- add rfc3986-encoded passwords
+
 1.9.4.9 - 2015-04-23
 - bugfix in asm-diskgroup-usage perfdata, add perfdata for disk group max size (Thanks Bernhard Keppel)
 
