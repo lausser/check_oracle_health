@@ -2,6 +2,9 @@
 # Changelog of the check_oracle_health plugin #
 ###############################################
 
+1.9.4.9 - 2015-04-23
+- bugfix in asm-diskgroup-usage perfdata, add perfdata for disk group max size (Thanks Bernhard Keppel)
+
 1.9.4.8 - 2015-03-19
 - Convert ':/\' to '_' in --uniquelabels  (Thanks Simon Meggle)
 

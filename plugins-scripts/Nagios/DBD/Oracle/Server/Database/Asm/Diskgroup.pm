@@ -96,9 +96,11 @@ sub init {
   if ($params{mode} =~ /server::database::asm::diskgroup::(usage|free)/) {
     $self->{percent_used} =
 	($self->{total_mb} - $self->{usable_file_mb}) / $self->{total_mb} * 100;
+    $self->{used_file_mb} = $self->{total_mb} - $self->{usable_file_mb};
     $self->{percent_free} = 100 - $self->{percent_used};
     $self->{bytes_free} = $self->{usable_file_mb} * 1024 * 1024;
     $self->{bytes_max} = $self->{total_mb} * 1024 * 1024;
+    $self->{bytes_used} = $self->{used_file_mb} * 1024 * 1024;
 
     my $tlen = 20;
     my $len = int((($params{mode} =~ /asm::diskgroup::usage/) ?
@@ -147,10 +149,13 @@ sub nagios {
               $self->{warningrange}, $self->{criticalrange});
           $self->add_perfdata(sprintf "\'dg_%s_usage\'=%dMB;%d;%d;%d;%d",
               lc $self->{name},
-              $self->{usable_file_mb},
+              $self->{used_file_mb},
               $self->{warningrange} * $self->{total_mb} / 100,
               $self->{criticalrange} * $self->{total_mb} / 100,
               0, $self->{total_mb});
+          $self->add_perfdata(sprintf "\'dg_%s_size\'=%dMB",
+              lc $self->{name},
+              $self->{total_mb});
         } elsif ($params{mode} =~ /server::database::asm::diskgroup::free/) {
           if (! $params{units}) {
             $params{units} = "%";
@@ -173,6 +178,9 @@ sub nagios {
                 $self->{warningrange} * $self->{bytes_max} / 100 / 1048576,
                 $self->{criticalrange} * $self->{bytes_max} / 100 / 1048576,
                 $self->{bytes_max} / 1048576);
+            $self->add_perfdata(sprintf "\'dg_%s_size\'=%dMB",
+                lc $self->{name},
+                $self->{total_mb});
           } else {
             my $factor = 1024 * 1024; # default MB
             if ($params{units} eq "GB") {
@@ -216,6 +224,10 @@ sub nagios {
                 $self->{warningrange},
                 $self->{criticalrange},
                 $self->{bytes_max} / $factor);
+            $self->add_perfdata(sprintf "\'dg_%s_size\'=%.2f%s",
+                lc $self->{name},
+                $self->{bytes_max} / $factor,
+                $params{units});
           }
         }
       } else {
