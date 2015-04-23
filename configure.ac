@@ -56,11 +56,6 @@ AC_ARG_WITH(mymodules_dyn_dir,
 AC_SUBST(MYMODULES_DYN_DIR, $with_mymodules_dyn_dir)
 echo variable with_mymodules_dyn_dir is $with_mymodules_dyn_dir
 
-AC_ARG_WITH(perl,
-  ACX_HELP_STRING([--with-perl=PATH],
-    [sets path to perl executable]),
-  with_perl=$withval,with_perl=$PERL)
-AC_SUBST(PERL, $with_perl)
 
 EXTRAS=
 # PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/etc:/usr/local/bin:/usr/local/sbin:$PATH
@@ -75,9 +70,16 @@ AC_PATH_PROG(ECHO,echo)
 AC_PATH_PROG(SED,sed)
 AC_PATH_PROG(GREP,grep)
 AC_PATH_PROG(CAT,cat)
-
-
-
+AC_PATH_PROG(SH,sh)
+AC_PATH_PROG(PERL,perl)
+AC_PATH_PROG(GZIP,gzip)
+AC_PATH_PROGS(AWK,gawk nawk /usr/xpg4/bin/awk awk)
+# allow them to override the path of perl
+AC_ARG_WITH(perl,
+  ACX_HELP_STRING([--with-perl=PATH],
+    [sets path to perl executable]),
+  with_perl=$withval,with_perl=$PERL)
+AC_SUBST(PERL, $with_perl)
 
 # Checks for libraries.
 
@@ -98,5 +100,4 @@ ACX_FEATURE([with],[nagios-user])
 ACX_FEATURE([with],[nagios-group])
 ACX_FEATURE([with],[mymodules-dir])
 ACX_FEATURE([with],[mymodules-dyn-dir])
-# allow them to override the path of perl
 
