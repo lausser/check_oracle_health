@@ -1080,7 +1080,7 @@ sub init {
     }
   } else {
     if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
-      if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\.]+)/) {
+      if ($self->{connect} && $self->{connect} =~ /(\w+?)\/(.+)@([\w\-\.]+)/) {
         $self->{connect} = $3;
         $self->{username} = $1;
         $self->{password} = $2;
@@ -1402,7 +1402,7 @@ sub init {
     }
   } else {
     if ($self->{connect} && ! $self->{username} && ! $self->{password} &&
-        $self->{connect} =~ /(\w+)\/(\w+)@([\w\-\._]+)(:(\d+))*(\/([\w\-\._]+))*/) {
+        $self->{connect} =~ /(\w+?)\/(.+)@([\w\-\._]+)(:(\d+))*(\/([\w\-\._]+))*/) {
       # --connect nagios/oradbmon@bba
       $self->{connect} = $3;
       $self->{username} = $1;
@@ -1927,13 +1927,13 @@ sub init {
     }
   } else {
     if (! $self->{connect} || ! $self->{username} || ! $self->{password}) {
-      if ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\.\w]+):(\d+)/) {
+      if ($self->{connect} && $self->{connect} =~ /(\w+?)\/(.+)@([\.\w]+):(\d+)/) {
         $self->{username} = $1;
         $self->{password} = $2;
         $self->{host} = $3; 
         $self->{port} = $4;
         $self->{socket} = "";
-      } elsif ($self->{connect} && $self->{connect} =~ /(\w+)\/(\w+)@([\.\w]+):([\w\/]+)/) {
+      } elsif ($self->{connect} && $self->{connect} =~ /(\w+?)\/(.+)@([\.\w]+):([\w\/]+)/) {
         $self->{username} = $1;
         $self->{password} = $2;
         $self->{host} = $3; 
@@ -1977,8 +1977,8 @@ sub init {
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       if ($self->{handle} = DBI->connect(
           sprintf("DBI:SQLRelay:host=%s;port=%d;socket=%s", $self->{host}, $self->{port}, $self->{socket}),
-          $self->decode_password($self->{username}),
-          $self->{password},
+          $self->{username},
+          $self->decode_password($self->{password}),
           { RaiseError => 1, AutoCommit => $self->{commit}, PrintError => 1 })) {
         $self->{handle}->do(q{
             ALTER SESSION SET NLS_NUMERIC_CHARACTERS=".," });
