@@ -29,7 +29,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
         ($params{mode} =~ /server::database::tablespace::listtablespaces/)) {
       my @tablespaceresult = ();
       if (DBD::Oracle::Server::return_first_server()->version_is_minimum("9.x")) {
-        @tablespaceresult = $params{handle}->fetchall_array(q{
+        my $tbs_sql = q{
             SELECT
                 a.tablespace_name         "Tablespace",
                 b.status                  "Status",
@@ -83,7 +83,8 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 a.tablespace_name = c.tablespace_name (+)
                 AND a.tablespace_name = b.tablespace_name
                 AND a.tablespace_name = d.tablespace_name (+)
-            UNION ALL
+        };
+        my $tbs_sql_temp = q{
             SELECT
                 d.tablespace_name "Tablespace",
                 b.status "Status",
@@ -110,7 +111,11 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 d.tablespace_name
             ORDER BY
                 1
-        });
+        };
+        if (! $params{notemp}) {
+          $tbs_sql = sprintf "%s\nUNION\n%s", $tbs_sql, $tbs_sql_temp;
+        }
+        @tablespaceresult = $params{handle}->fetchall_array($tbs_sql);
       } elsif (DBD::Oracle::Server::return_first_server()->version_is_minimum("8.x")) {
         @tablespaceresult = $params{handle}->fetchall_array(q{
             SELECT
