@@ -1,5 +1,5 @@
 * 2.1 - 2015-07-25
-  better sql for tablespace-free (should run faster now)
+  optimized sql for tablespace-free with --notemp (Thanks Frank)
 * 2.0 - 2015-04-23
   add rfc3986-encoded passwords
 * 1.9.4.9 - 2015-04-23

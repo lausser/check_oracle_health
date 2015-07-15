@@ -29,7 +29,53 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
         ($params{mode} =~ /server::database::tablespace::listtablespaces/)) {
       my @tablespaceresult = ();
       if (DBD::Oracle::Server::return_first_server()->version_is_minimum("9.x")) {
-        my $tbs_sql = q{
+        my $tbs_sql_undo = q{
+                -- freier platz durch expired extents
+                -- speziell fuer undo tablespaces
+                -- => bytes_expired
+                SELECT
+                    a.tablespace_name,
+                    SUM(a.bytes) bytes_expired
+                FROM
+                    dba_undo_extents a
+                WHERE
+                    status = 'EXPIRED'
+                GROUP BY
+                    tablespace_name
+        };
+        my $tbs_sql_undo_empty = q{
+                SELECT NULL AS tablespace_name, NULL AS bytes_expired FROM DUAL
+        };
+        my $tbs_sql_temp = q{
+            UNION
+            SELECT
+                d.tablespace_name "Tablespace",
+                b.status "Status",
+                b.contents "Type",
+                b.extent_management "Extent Mgmt",
+                sum(a.bytes_free + a.bytes_used) bytes,   -- allocated
+                SUM(DECODE(d.autoextensible, 'YES', d.maxbytes, 'NO', d.bytes)) bytes_max,
+                SUM(a.bytes_free + a.bytes_used - NVL(c.bytes_used, 0)) bytes_free
+            FROM
+                sys.v_$TEMP_SPACE_HEADER a,
+                sys.dba_tablespaces b,
+                sys.v_$Temp_extent_pool c,
+                dba_temp_files d
+            WHERE
+                c.file_id(+)             = a.file_id
+                and c.tablespace_name(+) = a.tablespace_name
+                and d.file_id            = a.file_id
+                and d.tablespace_name    = a.tablespace_name
+                and b.tablespace_name    = a.tablespace_name
+            GROUP BY
+                b.status,
+                b.contents,
+                b.extent_management,
+                d.tablespace_name
+            ORDER BY
+                1
+        };
+        my $tbs_sql = sprintf q{
             SELECT
                 a.tablespace_name         "Tablespace",
                 b.status                  "Status",
@@ -66,55 +112,18 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                     tablespace_name
               ) c,
               (
-                -- freier platz durch expired extents 
-                -- speziell fuer undo tablespaces
-                -- => bytes_expired
-                SELECT 
-                    a.tablespace_name,
-                    SUM(a.bytes) bytes_expired
-                FROM
-                    dba_undo_extents a
-                WHERE
-                    status = 'EXPIRED' 
-                GROUP BY
-                    tablespace_name
+                %s
               ) d
             WHERE
                 a.tablespace_name = c.tablespace_name (+)
                 AND a.tablespace_name = b.tablespace_name
                 AND a.tablespace_name = d.tablespace_name (+)
-        };
-        my $tbs_sql_temp = q{
-            SELECT
-                d.tablespace_name "Tablespace",
-                b.status "Status",
-                b.contents "Type",
-                b.extent_management "Extent Mgmt",
-                sum(a.bytes_free + a.bytes_used) bytes,   -- allocated
-                SUM(DECODE(d.autoextensible, 'YES', d.maxbytes, 'NO', d.bytes)) bytes_max,
-                SUM(a.bytes_free + a.bytes_used - NVL(c.bytes_used, 0)) bytes_free
-            FROM
-                sys.v_$TEMP_SPACE_HEADER a,
-                sys.dba_tablespaces b,
-                sys.v_$Temp_extent_pool c,
-                dba_temp_files d
-            WHERE
-                c.file_id(+)             = a.file_id
-                and c.tablespace_name(+) = a.tablespace_name
-                and d.file_id            = a.file_id
-                and d.tablespace_name    = a.tablespace_name
-                and b.tablespace_name    = a.tablespace_name
-            GROUP BY
-                b.status,
-                b.contents,
-                b.extent_management,
-                d.tablespace_name
-            ORDER BY
-                1
-        };
-        if (! $params{notemp}) {
-          $tbs_sql = sprintf "%s\nUNION\n%s", $tbs_sql, $tbs_sql_temp;
-        }
+                %s
+            %s
+        }, $params{notemp} ? $tbs_sql_undo_empty : $tbs_sql_undo,
+           $params{notemp} ? "AND (b.contents != 'TEMPORARY' AND b.contents != 'UNDO')" : "",
+           $params{notemp} ? "" : $tbs_sql_temp;
+        $tbs_sql = join "\n", grep !/^\s*$/, split(/\n/, $tbs_sql);
         @tablespaceresult = $params{handle}->fetchall_array($tbs_sql);
       } elsif (DBD::Oracle::Server::return_first_server()->version_is_minimum("8.x")) {
         @tablespaceresult = $params{handle}->fetchall_array(q{
