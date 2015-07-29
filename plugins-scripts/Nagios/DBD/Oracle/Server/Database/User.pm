@@ -39,7 +39,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
         }
         my %thisparams = %params;
         $thisparams{name} = $name;
-        $thisparams{valid_days} = $valid_days;
+        $thisparams{valid_days} = $valid_days if (defined $valid_days && $valid_days ne "");
         $thisparams{status} = $status;
         my $user = DBD::Oracle::Server::Database::User->new(
             %thisparams);

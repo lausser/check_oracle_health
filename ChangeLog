@@ -1,3 +1,6 @@
+* 2.1.1 - 2015-07-29
+  bugfix in password-expiration
+  bugfix in rfc-password-encoding and method sqlplus
 * 2.1 - 2015-07-25
   optimized sql for tablespace-free with --notemp (Thanks Frank)
 * 2.0 - 2015-04-23
