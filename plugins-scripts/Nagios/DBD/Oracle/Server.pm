@@ -1152,6 +1152,13 @@ sub init {
         $dsn = sprintf "DBI:Oracle:";
         $username = '';
       }
+	  
+	  if ($self->{username} =~ /^([\w\-\._]+)@(sysdba)/) {
+		$username = $1;
+        $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
+              ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA	  
+	  }
+	  
       if ($self->{handle} = DBI->connect(
           $dsn,
           $username,
