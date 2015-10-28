@@ -422,6 +422,29 @@ sub check_thresholds {
   #
 }
 
+sub range_calculate {
+  my $self = shift;
+  my $range = shift;
+  my $expr = shift;
+  my $result = "";
+
+  if ($range =~ /^([-+]?[0-9]*\.?[0-9]+)$/) {
+    # threshold = 10, crit if > 10 or < 0
+    $result = eval ("$1 $expr");
+  } elsif ($range =~ /^([-+]?[0-9]*\.?[0-9]+):$/) {
+    # threshold = 10:, crit if < 10
+    $result = eval ("$1 $expr") .":";
+  } elsif ($range =~ /^~:([-+]?[0-9]*\.?[0-9]+)$/) {
+    # threshold = ~:10, crit if > 10
+    $result = "~:" . eval ("$1 $expr");
+  } elsif ($range =~ /^(@?)([-+]?[0-9]*\.?[0-9]+):([-+]?[0-9]*\.?[0-9]+)$/) {
+    # threshold = 10:20, crit if < 10 or > 20
+    # threshold = @10:20, crit if >= 10 and <= 20
+    $result = $1 . eval ("$2 $expr") . ":" . eval ("$3 $expr");
+  }
+  return $result;
+}
+
 sub add_nagios {
   my $self = shift;
   my $level = shift;
