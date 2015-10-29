@@ -108,13 +108,13 @@ sub nagios {
           $self->check_thresholds($self->{percent_used}, "90", "98"),
                 sprintf("flra (%s) usage is %.2f%%",
                     $self->{name}, $self->{percent_used}));
-      $self->add_perfdata(sprintf "\'flra_usage_pct\'=%.2f%%;%d;%d",
+      $self->add_perfdata(sprintf "\'flra_usage_pct\'=%.2f%%;%s;%s",
           $self->{percent_used},
           $self->{warningrange}, $self->{criticalrange});
-      $self->add_perfdata(sprintf "\'flra_usage\'=%dMB;%d;%d;%d;%d",
+      $self->add_perfdata(sprintf "\'flra_usage\'=%dMB;%s;%s;%d;%d",
           ($self->{space_used} - $self->{space_reclaimable}) / 1048576,
-          $self->{warningrange} * $self->{space_limit} / 100 / 1048576,
-          $self->{criticalrange} * $self->{space_limit} / 100 / 1048576,
+          $self->range_calculate( $self->{warningrange}, " * $self->{space_limit} / 100 / 1048576"),
+          $self->range_calculate( $self->{criticalrange}, " * $self->{space_limit} / 100 / 1048576"),
           0, $self->{space_limit} / 1048576);
     } elsif ($params{mode} =~ /server::database::flash_recovery_area::free/) {
       if (($self->{warningrange} && $self->{warningrange} !~ /^\d+:/) || 
