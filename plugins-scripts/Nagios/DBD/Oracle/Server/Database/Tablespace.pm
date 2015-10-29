@@ -34,14 +34,20 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 -- speziell fuer undo tablespaces
                 -- => bytes_expired
                 SELECT
-                    a.tablespace_name,
-                    SUM(a.bytes) bytes_expired
+                    tablespace_name, bytes_expired
                 FROM
-                    dba_undo_extents a
+                    (
+                        SELECT
+                            a.tablespace_name,
+                            SUM (a.bytes) bytes_expired,
+                            a.status
+                        FROM
+                            dba_undo_extents a
+                        GROUP BY
+                            tablespace_name, status
+                    )
                 WHERE
                     status = 'EXPIRED'
-                GROUP BY
-                    tablespace_name
         };
         my $tbs_sql_undo_empty = q{
                 SELECT NULL AS tablespace_name, NULL AS bytes_expired FROM DUAL
