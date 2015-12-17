@@ -82,7 +82,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 1
         };
         my $tbs_sql = sprintf q{
-            SELECT
+            SELECT /*+ opt_param('optimizer_adaptive_features','false') */
                 a.tablespace_name         "Tablespace",
                 b.status                  "Status",
                 b.contents                "Type",
