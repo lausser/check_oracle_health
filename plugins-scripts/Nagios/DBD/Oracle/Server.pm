@@ -1169,11 +1169,14 @@ sub init {
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
       my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
       my $username = $self->{username};
-      if ($self->{username} eq "sys" || $self->{username} eq "sysdba" || $self->{username} eq "asmsnmp") {
+      if ($self->{username} eq "sysdba" || $self->{username} eq "asmsnmp") {
         $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
               ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA
         $dsn = sprintf "DBI:Oracle:";
         $username = '';
+      }
+      elsif ($self->{username} eq "sys") {
+        $connecthash->{ora_session_mode} = 2; # DBD::Oracle::ORA_SYSDBA
       }
 	  
       if ($self->{username} =~ /^([\w\-\._]+)@(sysdba)/) {
@@ -1181,7 +1184,7 @@ sub init {
         $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
               ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA	  
       }
-	  
+
       if ($self->{handle} = DBI->connect(
           $dsn,
           $username,
