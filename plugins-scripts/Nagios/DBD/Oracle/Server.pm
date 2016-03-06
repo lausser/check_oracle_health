@@ -1167,24 +1167,24 @@ sub init {
       }
       alarm($self->{timeout} - 1); # 1 second before the global unknown timeout
       my $dsn = sprintf "DBI:Oracle:%s", $self->{connect};
-      my $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0 };
+      my $connecthash = {
+          RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
+      };
+      my $sysdba_connecthash = {
+          RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
+          ora_session_mode => 2, # DBD::Oracle::ORA_SYSDBA
+      };
       my $username = $self->{username};
       if ($self->{username} eq "sysdba" || $self->{username} eq "asmsnmp") {
-        $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
-              ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA
+        $connecthash = $sysdba_connecthash;
         $dsn = sprintf "DBI:Oracle:";
         $username = '';
-      }
-      elsif ($self->{username} eq "sys") {
-        $connecthash->{ora_session_mode} = 2; # DBD::Oracle::ORA_SYSDBA
-      }
-	  
-      if ($self->{username} =~ /^([\w\-\._]+)@(sysdba)/) {
+      } elsif ($self->{username} eq "sys") {
+        $connecthash = $sysdba_connecthash;
+      } elsif ($self->{username} =~ /^([\w\-\._]+)@(sysdba)/) {
         $username = $1;
-        $connecthash = { RaiseError => 0, AutoCommit => $self->{commit}, PrintError => 0,
-              ora_session_mode => 2 }; # DBD::Oracle::ORA_SYSDBA	  
+        $connecthash = $sysdba_connecthash;
       }
-
       if ($self->{handle} = DBI->connect(
           $dsn,
           $username,
