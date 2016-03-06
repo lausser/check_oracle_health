@@ -89,10 +89,7 @@ AC_SUBST(PERL, $with_perl)
 
 # Checks for library functions.
 
-AC_CONFIG_FILES([Makefile
-                 plugins-scripts/Makefile
-                 plugins-scripts/subst
-                 t/Makefile])
+AC_CONFIG_FILES([Makefile plugins-scripts/Makefile plugins-scripts/subst t/Makefile])
 AC_OUTPUT
 ACX_FEATURE([with],[perl])
 ACX_FEATURE([with],[statefiles-dir])
