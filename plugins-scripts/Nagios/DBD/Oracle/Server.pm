@@ -74,6 +74,7 @@ sub new {
       # Don't even ask me to have a look at it. You'll have to pay for it.
       # And believe me, upgrading to a recent version of Oracle will be
       # much more cheaper.
+      $self->{handle}->{errstr} = ""; # be forgiving this time
       $self->{version} = $self->{handle}->fetchrow_array(
           q{ SELECT version FROM product_component_version 
                WHERE product LIKE '%Server%' OR

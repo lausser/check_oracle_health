@@ -90,6 +90,7 @@ sub init_shared_pool_free {
     $self->add_nagios_critical("unable to get sga free");
     return undef;
   }
+  $self->protect_value(\%params, 'free_percent', 'free_percent', 'percent');
 }
 
 sub init_shared_pool_parser {
