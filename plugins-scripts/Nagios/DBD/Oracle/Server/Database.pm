@@ -142,14 +142,14 @@ sub init_invalid_objects {
         $self->{handle}->fetchall_array(q{
             SELECT 'dba_registry', namespace||'.'||comp_name||'-'||version||' is '||status
             FROM dba_registry
-            WHERE status <> 'VALID'
+            WHERE status <> 'VALID' AND status <> 'OPTION OFF'
         });
   } else {
     @{$self->{invalidobjects}->{invalid_registry_components_list}} =
         $self->{handle}->fetchall_array(q{
             SELECT 'dba_registry', 'SCHEMA.'||comp_name||'-'||version||' is '||status
             FROM dba_registry
-            WHERE status <> 'VALID'
+            WHERE status <> 'VALID' AND status <> 'OPTION OFF'
         });
   }
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
