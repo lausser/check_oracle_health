@@ -36,7 +36,7 @@ sub init {
           from v$archived_log
           where applied='YES' and registrar='RFS'
         });     
-    if (! defined $self->{last_applied_time}) {
+    if (! defined $self->{last_applied_time} || $self->{last_applied_time} eq "") {
       $self->add_nagios_critical("Unable to get archived log apply time");
     }
   } elsif ($params{mode} =~ /server::database::dataguard::mrp_status/) {

@@ -1,5 +1,6 @@
 * 2.1.3.4 - 2016-03-30
   bugfix in invalid-objects/registry (Thanks Horst Mund)
+  bugfix in dataguard last-appled-time (with sqlplus-method)
 * 2.1.3.3 - 2016-03-08
   remove leftover errstr from dbi-login
   protect sga-shared-pool-free 
