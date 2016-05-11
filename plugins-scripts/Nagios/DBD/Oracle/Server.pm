@@ -1186,6 +1186,9 @@ sub init {
         $username = $1;
         $connecthash = $sysdba_connecthash;
       }
+      elsif ($dsn =~ s/\s+as sysdba$//i) {
+        $connecthash = $sysdba_connecthash;
+      }
       if ($self->{handle} = DBI->connect(
           $dsn,
           $username,
