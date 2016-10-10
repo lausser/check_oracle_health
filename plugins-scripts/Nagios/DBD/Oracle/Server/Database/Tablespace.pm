@@ -269,6 +269,157 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
         $initerrors = 1;
         return undef;
       }
+    } elsif (($params{mode} =~ /server::cdatabase::tablespace::usage/) ||
+        ($params{mode} =~ /server::cdatabase::tablespace::free/) ||
+        ($params{mode} =~ /server::cdatabase::tablespace::listtablespaces/)) {
+      my @tablespaceresult = ();
+      if (DBD::Oracle::Server::return_first_server()->version_is_minimum("9.x")) {
+        my $tbs_sql_undo = q{
+                -- freier platz durch expired extents
+                -- speziell fuer undo tablespaces
+                -- => bytes_expired
+                SELECT
+                    tablespace_name, bytes_expired, con_id
+                FROM
+                    (
+                        SELECT
+                            tablespace_name,
+                            SUM (bytes) bytes_expired,
+                            status,
+                            con_id
+                        FROM
+                            cdb_undo_extents
+                        GROUP BY
+                            con_id, tablespace_name, status
+                    )
+                WHERE
+                    status = 'EXPIRED'
+        };
+        my $tbs_sql_undo_empty = q{
+                SELECT NULL AS tablespace_name, NULL AS bytes_expired, NULL AS con_id FROM DUAL
+        };
+        my $tbs_sql_temp = q{
+            UNION
+            SELECT
+                e.name||'_'||b.tablespace_name "Tablespace",
+                b.status "Status",
+                b.contents "Type",
+                b.extent_management "Extent Mgmt",
+                sum(a.bytes_free + a.bytes_used) bytes,   -- allocated
+                SUM(DECODE(d.autoextensible, 'YES', d.maxbytes, 'NO', d.bytes)) bytes_max,
+                SUM(a.bytes_free + a.bytes_used - NVL(c.bytes_used, 0)) bytes_free
+            FROM
+                sys.v_$TEMP_SPACE_HEADER a, -- has con_id
+                sys.cdb_tablespaces b, -- has con_id
+                sys.v_$Temp_extent_pool c,
+                cdb_temp_files d, -- has con_id
+                v$containers e
+            WHERE
+                a.file_id = c.file_id(+)
+                AND a.file_id = d.file_id
+                AND a.tablespace_name = c.tablespace_name(+)
+                AND a.tablespace_name = d.tablespace_name
+                AND a.tablespace_name = b.tablespace_name
+                AND a.con_id = c.con_id(+)
+                AND a.con_id = d.con_id
+                AND a.con_id = b.con_id
+                AND a.con_id = e.con_id
+            GROUP BY
+                e.name,
+                b.con_id,
+                b.status,
+                b.contents,
+                b.extent_management,
+                b.tablespace_name
+            ORDER BY
+                1
+        };
+        my $tbs_sql = sprintf q{
+            SELECT /*+ opt_param('optimizer_adaptive_features','false') */
+                e.name||'_'||a.tablespace_name         "Tablespace",
+                b.status                  "Status",
+                b.contents                "Type",
+                b.extent_management       "Extent Mgmt",
+                a.bytes                   bytes,
+                a.maxbytes                bytes_max,
+                c.bytes_free + NVL(d.bytes_expired,0)             bytes_free
+            FROM
+              (
+                -- belegter und maximal verfuegbarer platz pro datafile
+                -- nach tablespacenamen zusammengefasst
+                -- => bytes
+                -- => maxbytes
+                SELECT
+                    a.con_id,
+                    a.tablespace_name,
+                    SUM(a.bytes)          bytes,
+                    SUM(DECODE(a.autoextensible, 'YES', a.maxbytes, 'NO', a.bytes)) maxbytes
+                FROM
+                    cdb_data_files a
+                GROUP BY
+                    con_id, tablespace_name
+              ) a,
+              sys.cdb_tablespaces b,
+              (
+                -- freier platz pro tablespace
+                -- => bytes_free
+                SELECT
+                    a.con_id,
+                    a.tablespace_name,
+                    SUM(a.bytes) bytes_free
+                FROM
+                    cdb_free_space a
+                GROUP BY
+                    con_id, tablespace_name
+              ) c,
+              (
+                %s
+              ) d,
+              v$containers e
+            WHERE
+                a.tablespace_name = c.tablespace_name (+)
+                AND a.tablespace_name = b.tablespace_name
+                AND a.tablespace_name = d.tablespace_name (+)
+                AND a.con_id = c.con_id(+)
+                AND a.con_id = b.con_id
+                AND a.con_id = d.con_id(+)
+                AND a.con_id = e.con_id
+                %s
+            %s
+        }, $params{notemp} ? $tbs_sql_undo_empty : $tbs_sql_undo,
+           $params{notemp} ? "AND (b.contents != 'TEMPORARY' AND b.contents != 'UNDO')" : "",
+           $params{notemp} ? "" : $tbs_sql_temp;
+        $tbs_sql = join "\n", grep !/^\s*$/, split(/\n/, $tbs_sql);
+        @tablespaceresult = $params{handle}->fetchall_array($tbs_sql);
+      }
+      foreach (@tablespaceresult) {
+        my ($name, $status, $type, $extentmgmt, $bytes, $bytes_max, $bytes_free) = @{$_};
+        next if $params{notemp} && ($type eq "UNDO" || $type eq "TEMPORARY");
+        next if $params{noreadonly} && ($status eq "READ ONLY");
+        next if $params{container} && ($name !~ /^$params{container}_/i);
+        if ($params{regexp}) {
+          next if $params{selectname} && $name !~ /$params{selectname}/;
+        } else {
+          next if $params{selectname} && lc $params{selectname} ne lc $name;
+        }
+        # host_filesys_pctAvailable
+        my %thisparams = %params;
+        $thisparams{name} = $name;
+        $thisparams{bytes} = $bytes;
+        $thisparams{bytes_max} = $bytes_max;
+        $thisparams{bytes_free} = $bytes_free;
+        $thisparams{status} = lc $status;
+        $thisparams{type} = lc $type;
+        $thisparams{extent_management} = lc $extentmgmt;
+        my $tablespace = DBD::Oracle::Server::Database::Tablespace->new(
+            %thisparams);
+        add_tablespace($tablespace);
+        $num_tablespaces++;
+      }
+      if (! $num_tablespaces) {
+        $initerrors = 1;
+        return undef;
+      }
     } elsif ($params{mode} =~ /server::database::tablespace::fragmentation/) {
       my @tablespaceresult = $params{handle}->fetchall_array(q{
           SELECT
@@ -407,7 +558,7 @@ sub init {
   my %params = @_;
   $self->init_nagios();
   $self->set_local_db_thresholds(%params);
-  if ($params{mode} =~ /server::database::tablespace::(usage|free)/) {
+  if ($params{mode} =~ /server::[c]*database::tablespace::(usage|free)/) {
     if (! defined $self->{bytes_max} || $self->{bytes_max} eq '') { 
       # eq '' kommt z.b. vor, wenn ein datafile online_status recover hat
       # in dba_data_files sind dann bytes und maxbytes nicht belegt (Null)
@@ -450,7 +601,7 @@ sub init {
     }
     $self->{percent_free} = 100 - $self->{percent_used};
     my $tlen = 20;
-    my $len = int((($params{mode} =~ /server::database::tablespace::usage/) ?
+    my $len = int((($params{mode} =~ /server::[c]*database::tablespace::usage/) ?
         $self->{percent_used} : $self->{percent_free} / 100 * $tlen) + 0.5);
     $self->{percent_as_bar} = '=' x $len . '_' x ($tlen - $len);
   } elsif ($params{mode} =~ /server::database::tablespace::fragmentation/) {
@@ -524,7 +675,7 @@ sub nagios {
   my $self = shift;
   my %params = @_;
   if (! $self->{nagios_level}) {
-    if ($params{mode} =~ /server::database::tablespace::usage/) {
+    if ($params{mode} =~ /server::[c]*database::tablespace::usage/) {
       if (! $self->{bytes_max}) {
         $self->check_thresholds($self->{percent_used}, "90", "98");
         if ($self->{status} eq 'offline') {
@@ -571,7 +722,7 @@ sub nagios {
           lc $self->{name},
           $self->{fsfi},
           $self->{warningrange}, $self->{criticalrange});
-    } elsif ($params{mode} =~ /server::database::tablespace::free/) {
+    } elsif ($params{mode} =~ /server::[c]*database::tablespace::free/) {
       # ->percent_free
       # ->real_bytes_max
       #
