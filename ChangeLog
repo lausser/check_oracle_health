@@ -1,3 +1,5 @@
+* 3.0.1 - 2016-10-11
+  fix container-tablespace-free (Thanks Frank)
 * 3.0 - 2016-10-10
   add mode container-tablespace-free
 * 2.1.3.5 - 2016-05-11

@@ -142,7 +142,7 @@ sub init {
   $self->set_global_db_thresholds(\%params);
   if ($params{mode} =~ /^server::instance/) {
     $self->{instance} = DBD::Oracle::Server::Instance->new(%params);
-  } elsif ($params{mode} =~ /^server::database/) {
+  } elsif ($params{mode} =~ /^server::[c]*database/) {
     $self->{database} = DBD::Oracle::Server::Database->new(%params);
   } elsif ($params{mode} =~ /^server::sqlruntime/) {
     $self->set_local_db_thresholds(%params);
@@ -245,7 +245,7 @@ sub nagios {
     if ($params{mode} =~ /^server::instance/) {
       $self->{instance}->nagios(%params);
       $self->merge_nagios($self->{instance});
-    } elsif ($params{mode} =~ /^server::database/) {
+    } elsif ($params{mode} =~ /^server::[c]*database/) {
       $self->{database}->nagios(%params);
       $self->merge_nagios($self->{database});
     } elsif ($params{mode} =~ /^server::connectiontime/) {

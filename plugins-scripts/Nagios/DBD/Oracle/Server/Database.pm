@@ -36,7 +36,7 @@ sub init {
   my $self = shift;
   my %params = @_;
   $self->init_nagios();
-  if ($params{mode} =~ /server::database::tablespace/) {
+  if ($params{mode} =~ /server::[c]*database::tablespace/) {
     DBD::Oracle::Server::Database::Tablespace::init_tablespaces(%params);
     if (my @tablespaces = 
         DBD::Oracle::Server::Database::Tablespace::return_tablespaces()) {
@@ -44,7 +44,7 @@ sub init {
     } else {
       $self->add_nagios_critical("unable to aquire tablespace info");
     }
-  } elsif ($params{mode} =~ /server::database::flash_recovery_area/) {
+  } elsif ($params{mode} =~ /server::[c]*database::flash_recovery_area/) {
     DBD::Oracle::Server::Database::FlashRecoveryArea::init_flash_recovery_areas(%params);
     if (my @flash_recovery_areas = 
         DBD::Oracle::Server::Database::FlashRecoveryArea::return_flash_recovery_areas()) {
@@ -341,12 +341,12 @@ sub nagios {
   my $self = shift;
   my %params = @_;
   if (! $self->{nagios_level}) {
-    if ($params{mode} =~ /server::database::tablespace::listtablespaces/) {
+    if ($params{mode} =~ /server::[c]*database::tablespace::listtablespaces/) {
       foreach (sort { $a->{name} cmp $b->{name}; }  @{$self->{tablespaces}}) {
 	printf "%s\n", $_->{name};
       }
       $self->add_nagios_ok("have fun");
-    } elsif ($params{mode} =~ /server::database::tablespace/) {
+    } elsif ($params{mode} =~ /server::[c]*database::tablespace/) {
       foreach (@{$self->{tablespaces}}) {
         # sind hier noch nach pctused sortiert
         $_->nagios(%params);
