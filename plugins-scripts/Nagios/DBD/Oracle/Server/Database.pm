@@ -235,8 +235,15 @@ sub init_corrupted_blocks {
   }
   @{$self->{corruptedobjects}->{extents_list}} =
       $self->{handle}->fetchall_array(q{
-      WITH mytable AS (
-      SELECT
+      WITH
+      block_corruption AS (
+          SELECT /*+ materialize */
+              *
+          FROM
+              v$database_block_corruption
+      ),
+      mytable AS (
+      SELECT /*+ LEADING(vdbc dbe) USE_NL(vdbc dbe) */
           dbe.owner db_owner,
           dbe.segment_name obj_name,
           dbe.partition_name part_name,
@@ -250,7 +257,7 @@ sub init_corrupted_blocks {
           'dba_extents' description
       FROM
           dba_extents dbe,
-          v$database_block_corruption vdbc
+          block_corruption vdbc
       WHERE 1=1
       AND dbe.file_id = vdbc.file#
       AND dbe.block_id <= vdbc.block# + vdbc.blocks - 1
