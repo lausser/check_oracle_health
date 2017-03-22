@@ -1157,7 +1157,7 @@ sub init {
             sub {
                 if (1) {
                   printf "CRITICAL - received TERM signal\n";
-                  kill 9, 0;
+                  exit 2;
                 } else {
                   die "sigterm\n" ;      
                 }
