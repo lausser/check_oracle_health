@@ -84,9 +84,9 @@ sub init {
         FROM v$resource_limit WHERE resource_name LIKE '%processes%'
     });
   } elsif ($params{mode} =~ /server::instance::jobs/) {
-    @{$self->{failed_jobs}} = $self->{handle}->fetchrow_array(q{
+    @{$self->{failed_jobs}} = $self->{handle}->fetchall_array(q{
         SELECT
-          job_log.job_name
+          job_log.job_name, job_log.log_date
         FROM
           dba_scheduler_job_log job_log, (
               SELECT
@@ -97,9 +97,9 @@ sub init {
                 job_name
           ) last_run
         WHERE
-          status = 'FAILED' AND
-          log_date > sysdate - (? / 1440) AND
-          last_run.max_date=job_log.log_date; 
+          job_log.status = 'FAILED' AND
+          job_log.log_date > sysdate - (? / 1440) AND
+          last_run.max_date = job_log.log_date
     }, ($params{lookback} || 30));
   }
 }
@@ -190,7 +190,9 @@ sub nagios {
         sprintf "%d jobs have failed in the last %d minutes",
             scalar(@{$self->{failed_jobs}}), $params{lookback} || 30);
     if ($self->{nagios_level}) {
-      $self->add_nagios_ok(join(", ", @{$self->{failed_jobs}}));
+      $self->add_nagios_ok(join(", ", map {
+        $_->[0].'@'.$_->[1];
+      } @{$self->{failed_jobs}}));
     }
   }
 }

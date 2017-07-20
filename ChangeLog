@@ -1,3 +1,5 @@
+* 3.1.0.1 - 2017-07-20
+  output date of failed jobs
 * 3.1 - 2017-07-19
   add modes datafiles-recovery and datafiles-offline
   add mode failed-jobs
