@@ -83,6 +83,24 @@ sub init {
         SELECT current_utilization/limit_value*100 
         FROM v$resource_limit WHERE resource_name LIKE '%processes%'
     });
+  } elsif ($params{mode} =~ /server::instance::jobs/) {
+    @{$self->{failed_jobs}} = $self->{handle}->fetchrow_array(q{
+        SELECT
+          job_log.job_name
+        FROM
+          dba_scheduler_job_log job_log, (
+              SELECT
+                MAX(log_date) max_date, job_name
+              FROM
+                dba_scheduler_job_log
+              GROUP BY
+                job_name
+          ) last_run
+        WHERE
+          status = 'FAILED' AND
+          log_date > sysdate - (? / 1440) AND
+          last_run.max_date=job_log.log_date; 
+    }, ($params{lookback} || 30));
   }
 }
 
@@ -166,6 +184,14 @@ sub nagios {
       $self->add_perfdata(sprintf "process_usage=%.2f%%;%d;%d",
           $self->{process_usage},
           $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::jobs/) {
+    $self->add_nagios(
+        $self->check_thresholds(scalar(@{$self->{failed_jobs}}), 0, 0),
+        sprintf "%d jobs have failed in the last %d minutes",
+            scalar(@{$self->{failed_jobs}}), $params{lookback} || 30);
+    if ($self->{nagios_level}) {
+      $self->add_nagios_ok(join(", ", @{$self->{failed_jobs}}));
+    }
   }
 }
 

@@ -73,6 +73,14 @@ sub init {
       ! defined $self->{num_datafiles}) {
       $self->add_nagios_critical("unable to get number of datafiles");
     }
+  } elsif ($params{mode} =~ /server::database::datafilesoffline/) {
+    @{$self->{offline_datafiles}} = $self->{handle}->fetchrow_array(q{
+        SELECT name FROM v$datafile WHERE status = 'OFFLINE'
+    });
+  } elsif ($params{mode} =~ /server::database::datafilesrecovery/) {
+    @{$self->{recover_datafiles}} = $self->{handle}->fetchrow_array(q{
+        SELECT name FROM v$datafile_header WHERE recover = 'YES' OR (recover IS NULL AND error IS NOT NULL)
+    });
   } elsif ($params{mode} =~ /server::database::expiredpw/) {
     DBD::Oracle::Server::Database::User::init_users(%params);
     if (my @users = 
@@ -600,6 +608,22 @@ sub nagios {
           $self->{num_datafiles_max} / 100 * $self->{warningrange},
           $self->{num_datafiles_max} / 100 * $self->{criticalrange},
           $self->{num_datafiles_max});
+    } elsif ($params{mode} =~ /server::database::datafilesoffline/) {
+      my $num_offlines = scalar(@{$self->{offline_datafiles}});
+      $self->add_nagios(
+          $self->check_thresholds($num_offlines, 0, 0),
+          sprintf "you have %d offline datafiles", $num_offlines);
+      if ($self->{nagios_level}) {
+        $self->add_nagios_ok(join(", ", @{$self->{offline_datafiles}}));
+      }
+    } elsif ($params{mode} =~ /server::database::datafilesrecovery/) {
+      my $num_recover = scalar(@{$self->{recover_datafiles}});
+      $self->add_nagios(
+          $self->check_thresholds($num_recover, 0, 0),
+          sprintf "%d datafiles require media recovery", $num_recover);
+      if ($self->{nagios_level}) {
+        $self->add_nagios_ok(join(", ", @{$self->{recover_datafiles}}));
+      }
     } elsif ($params{mode} =~ /server::database::expiredpw/) {
       foreach (@{$self->{users}}) {
         $_->nagios(%params);
