@@ -74,12 +74,12 @@ sub init {
       $self->add_nagios_critical("unable to get number of datafiles");
     }
   } elsif ($params{mode} =~ /server::database::datafilesoffline/) {
-    @{$self->{offline_datafiles}} = $self->{handle}->fetchrow_array(q{
-        SELECT name FROM v$datafile WHERE status = 'OFFLINE'
+    @{$self->{offline_datafiles}} = $self->{handle}->fetchall_array(q{
+        SELECT name, tablespace_name, status FROM v$datafile_header WHERE status != 'ONLINE'
     });
   } elsif ($params{mode} =~ /server::database::datafilesrecovery/) {
-    @{$self->{recover_datafiles}} = $self->{handle}->fetchrow_array(q{
-        SELECT name FROM v$datafile_header WHERE recover = 'YES' OR (recover IS NULL AND error IS NOT NULL)
+    @{$self->{recover_datafiles}} = $self->{handle}->fetchall_array(q{
+        SELECT name, tablespace_name, recover, error FROM v$datafile_header WHERE recover = 'YES' OR (recover IS NULL AND error IS NOT NULL)
     });
   } elsif ($params{mode} =~ /server::database::expiredpw/) {
     DBD::Oracle::Server::Database::User::init_users(%params);
@@ -614,7 +614,10 @@ sub nagios {
           $self->check_thresholds($num_offlines, 0, 0),
           sprintf "you have %d offline datafiles", $num_offlines);
       if ($self->{nagios_level}) {
-        $self->add_nagios_ok(join(", ", @{$self->{offline_datafiles}}));
+        $self->add_nagios_ok(join(", ", map {
+          # name, tablespace_name, status
+          sprintf "%s(%s) is %s", $_->[0], $_->[1], $_->[2];
+        } @{$self->{offline_datafiles}}));
       }
     } elsif ($params{mode} =~ /server::database::datafilesrecovery/) {
       my $num_recover = scalar(@{$self->{recover_datafiles}});
@@ -622,7 +625,14 @@ sub nagios {
           $self->check_thresholds($num_recover, 0, 0),
           sprintf "%d datafiles require media recovery", $num_recover);
       if ($self->{nagios_level}) {
-        $self->add_nagios_ok(join(", ", @{$self->{recover_datafiles}}));
+        $self->add_nagios_ok(join(", ", map {
+          # name, tablespace_name, recover, error
+          if ($_->[2]) {
+            sprintf "%s(%s) needs to be recovered", $_->[0], $_->[1];
+          } else {
+            sprintf "%s(%s) has error %s", $_->[0], $_->[1], $_->[3];
+          }
+        }@{$self->{recover_datafiles}}));
       }
     } elsif ($params{mode} =~ /server::database::expiredpw/) {
       foreach (@{$self->{users}}) {
