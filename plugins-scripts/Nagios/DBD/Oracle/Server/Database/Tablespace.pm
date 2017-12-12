@@ -53,7 +53,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 SELECT NULL AS tablespace_name, NULL AS bytes_expired FROM DUAL
         };
         my $tbs_sql_temp = q{
-            UNION
+            UNION ALL
             SELECT
                 d.tablespace_name "Tablespace",
                 b.status "Status",
@@ -299,7 +299,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 SELECT NULL AS tablespace_name, NULL AS bytes_expired, NULL AS con_id FROM DUAL
         };
         my $tbs_sql_temp = q{
-            UNION
+            UNION ALL
             SELECT
                 e.name||'_'||b.tablespace_name "Tablespace",
                 b.status "Status",
