@@ -648,7 +648,7 @@ sub init {
         ($self->{bytes} - $self->{bytes_free}) / $self->{bytes_max} * 100;
     $self->{usage_history} = $self->load_state( %params ) || [];
     my $now = time;
-    my $lookback = ($params{lookback} || 30) * 24 * 3600;
+    my $horizont = (($params{lookback} || 30) + 1 ) * 24 * 3600;
     #$lookback = 91 * 24 * 3600;
     if (scalar(@{$self->{usage_history}})) {
       $self->trace(sprintf "loaded %d data sets from     %s - %s", 
@@ -657,7 +657,7 @@ sub init {
           scalar localtime($now));
       # only data sets with valid usage. only newer than 91 days
       $self->{usage_history} = 
-          [ grep { defined $_->[1] && ($now - $_->[0]) < $lookback } @{$self->{usage_history}} ];
+          [ grep { defined $_->[1] && ($now - $_->[0]) < $horizont } @{$self->{usage_history}} ];
       $self->trace(sprintf "trimmed to %d data sets from %s - %s", 
           scalar(@{$self->{usage_history}}),
           scalar localtime((@{$self->{usage_history}})[0]->[0]),
@@ -968,7 +968,7 @@ sub nagios {
         #    sqrt(($sumx2 - ($sumx ** 2)/$n) * ($sumy2 - ($sumy ** 2)/$n));
         $self->debug(sprintf "slope: %f  y-intersect: %f", $m, $b);
         if (abs($m) <= 0.000001) { # $m == 0 does not work even if $m is 0.000000
-          $self->add_nagios_ok("tablespace usage is constant");
+          $self->add_nagios_ok(sprintf"tablespace %s usage is constant",$self->{name});
         } elsif ($m > 0) {
           $remaining = (100 - $b) / $m;
           $self->add_nagios($self->check_thresholds($remaining, "90:", "30:"), 
@@ -979,10 +979,10 @@ sub nagios {
               $remaining,
               $self->{warningrange}, $self->{criticalrange});
         } else {
-          $self->add_nagios_ok("tablespace usage is decreasing");
+          $self->add_nagios_ok(sprintf"tablespace %s usage is decreasing",$self->{name});
         }
       } else {
-        $self->add_nagios_ok("no data available for prediction");
+        $self->add_nagios_ok(sprintf"no data available for prediction in %s",$self->{name});
       }
     } elsif ($params{mode} =~ 
         /server::database::tablespace::segment::extendspace/) {
