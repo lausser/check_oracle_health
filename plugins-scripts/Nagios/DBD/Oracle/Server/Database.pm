@@ -81,7 +81,8 @@ sub init {
     @{$self->{recover_datafiles}} = $self->{handle}->fetchall_array(q{
         SELECT name, tablespace_name, recover, error FROM v$datafile_header WHERE recover = 'YES' OR (recover IS NULL AND error IS NOT NULL)
     });
-  } elsif ($params{mode} =~ /server::database::expiredpw/) {
+  } elsif ($params{mode} =~ /server::database::expiredpw/ ||
+      $params{mode} =~ /server::database::accountlocked/) {
     DBD::Oracle::Server::Database::User::init_users(%params);
     if (my @users = 
         DBD::Oracle::Server::Database::User::return_users()) {

@@ -648,16 +648,15 @@ sub init {
         ($self->{bytes} - $self->{bytes_free}) / $self->{bytes_max} * 100;
     $self->{usage_history} = $self->load_state( %params ) || [];
     my $now = time;
-    my $lookback = ($params{lookback} || 30) * 24 * 3600;
-    #$lookback = 91 * 24 * 3600;
+    $self->{oldest_metric_time} = $now - ($params{lookback} || 30) * 24 * 3600;
     if (scalar(@{$self->{usage_history}})) {
       $self->trace(sprintf "loaded %d data sets from     %s - %s", 
           scalar(@{$self->{usage_history}}),
           scalar localtime((@{$self->{usage_history}})[0]->[0]),
           scalar localtime($now));
-      # only data sets with valid usage. only newer than 91 days
+      # only data sets with valid usage. only newer than lookback days
       $self->{usage_history} = 
-          [ grep { defined $_->[1] && ($now - $_->[0]) < $lookback } @{$self->{usage_history}} ];
+          [ grep { defined $_->[1] && ($_->[0]) >= $self->{oldest_metric_time} } @{$self->{usage_history}} ];
       $self->trace(sprintf "trimmed to %d data sets from %s - %s", 
           scalar(@{$self->{usage_history}}),
           scalar localtime((@{$self->{usage_history}})[0]->[0]),
@@ -929,25 +928,22 @@ sub nagios {
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ 
         /server::database::tablespace::remainingfreetime/) {
-      my $lookback = $params{lookback} || 30;
-      my $enoughvalues = 0;
-      my $newest = time - $lookback * 24 * 3600; 
-      my @tmp = grep { $_->[0] > $newest } @{$self->{usage_history}};
-      $self->trace(sprintf "found %d usable data sets since %s",
-          scalar(@tmp), scalar localtime($newest));
-      if ((scalar(@{$self->{usage_history}}) - scalar(@tmp) > 0) && 
-        (scalar(@tmp) >= 2)) {
+      my $num_metrics = scalar(@{$self->{usage_history}});
+      if (($num_metrics >= 2) &&
+          ($self->{usage_history}->[0]->[0] < $self->{oldest_metric_time} + 24 * 3600) &&
+          ($self->{usage_history}->[$num_metrics - 1]->[0] > time - 24 * 3600)) {
+
         # only if more than two values are available
-        # only if we have data really reaching back some days
+        # only if the oldest value is from lookback plus one day
+        # only if the newest value is from today
+        # (under normal circumstances it is only a second old)
         # predicting with two values from the last hour makes no sense
-        $self->{usage_history} = \@tmp;
         my $remaining = 99999;
         my $now = time; # normalisieren, so dass jetzt x=0
         my $n = 0; my $sumx = 0; my $sumx2 = 0; my $sumxy = 0; my $sumy = 0; my $sumy2 = 0; my $m = 0; my $r = 0; 
         my $start_usage = undef;
         my $stop_usage = undef;
         foreach (@{$self->{usage_history}}) {
-          next if $_->[0] < $newest;
           $start_usage = $_->[1] if ! defined $start_usage;
           $stop_usage = $_->[1];
           my $x = ($_->[0] - $now) / (24 * 3600);
