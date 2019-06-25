@@ -83,7 +83,7 @@ sub init {
         SELECT current_utilization/limit_value*100 
         FROM v$resource_limit WHERE resource_name LIKE '%processes%'
     });
-  } elsif ($params{mode} =~ /server::instance::jobs/) {
+  } elsif ($params{mode} =~ /server::instance::jobs::failed/) {
     @{$self->{failed_jobs}} = $self->{handle}->fetchall_array(q{
         SELECT
           job_log.job_name, job_log.log_date
@@ -101,6 +101,10 @@ sub init {
           job_log.log_date > sysdate - (? / 1440) AND
           last_run.max_date = job_log.log_date
     }, ($params{lookback} || 30));
+  } elsif ($params{mode} =~ /server::instance::jobs::scheduled/) {
+    ($self->{num_scheduled_jobs}) = $self->{handle}->fetchrow_array(q{
+        SELECT COUNT(*) FROM dba_scheduler_jobs
+    });
   }
 }
 
@@ -184,7 +188,7 @@ sub nagios {
       $self->add_perfdata(sprintf "process_usage=%.2f%%;%d;%d",
           $self->{process_usage},
           $self->{warningrange}, $self->{criticalrange});
-  } elsif ($params{mode} =~ /server::instance::jobs/) {
+  } elsif ($params{mode} =~ /server::instance::jobs::failed/) {
     $self->add_nagios(
         $self->check_thresholds(scalar(@{$self->{failed_jobs}}), 0, 0),
         sprintf "%d jobs have failed in the last %d minutes",
@@ -194,6 +198,12 @@ sub nagios {
         $_->[0].'@'.$_->[1];
       } @{$self->{failed_jobs}}));
     }
+  } elsif ($params{mode} =~ /server::instance::jobs::scheduled/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{num_scheduled_jobs}, 200, 300),
+          sprintf "%d scheduler jobs", $self->{num_scheduled_jobs});
+      $self->add_perfdata(sprintf "num_scheduler_jobs=%.2f;%s;%s",
+          $self->{num_scheduled_jobs}, $self->{warningrange}, $self->{criticalrange});
   }
 }
 
