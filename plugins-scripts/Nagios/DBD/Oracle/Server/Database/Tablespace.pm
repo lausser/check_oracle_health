@@ -602,7 +602,7 @@ sub init {
     $self->{percent_free} = 100 - $self->{percent_used};
     my $tlen = 20;
     my $len = int((($params{mode} =~ /server::[c]*database::tablespace::usage/) ?
-        $self->{percent_used} : $self->{percent_free} / 100 * $tlen) + 0.5);
+        $self->{percent_used} : $self->{percent_free}) / 100 * $tlen + 0.5);
     $self->{percent_as_bar} = '=' x $len . '_' x ($tlen - $len);
   } elsif ($params{mode} =~ /server::database::tablespace::fragmentation/) {
   } elsif ($params{mode} =~ /server::database::tablespace::segment::top10/) {
