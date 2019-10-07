@@ -99,7 +99,9 @@ sub init {
         WHERE
           job_log.status = 'FAILED' AND
           job_log.log_date > sysdate - (? / 1440) AND
-          last_run.max_date = job_log.log_date
+          last_run.max_date = job_log.log_date AND
+          -- stream propagation jobs are oracle internal
+          job_class <> 'AQ$_PROPAGATION_JOB_CLASS'
     }, ($params{lookback} || 30));
   } elsif ($params{mode} =~ /server::instance::jobs::scheduled/) {
     ($self->{num_scheduled_jobs}) = $self->{handle}->fetchrow_array(q{

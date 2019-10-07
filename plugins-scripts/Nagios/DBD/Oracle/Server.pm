@@ -1917,7 +1917,7 @@ sub create_commandfile {
   printf CMDCMD "SPOOL %s\n", $self->{sql_resultfile};
   #  printf CMDCMD "ALTER SESSION SET NLS_NUMERIC_CHARACTERS='.,';\n/\n";
   printf CMDCMD "%s\n/\n", $sql;
-  printf CMDCMD "SPOOL OFF\n", $sql;
+  printf CMDCMD "SPOOL OFF\n";
   printf CMDCMD "EXIT\n";
   close CMDCMD;
 }
