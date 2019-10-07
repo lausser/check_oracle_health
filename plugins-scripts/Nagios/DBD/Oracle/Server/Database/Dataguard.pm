@@ -60,7 +60,7 @@ sub init {
 #              V$DATAGUARD_STATS
 #          WHERE
 #              name = 'apply lag'
-#        });     
+#        });
     if (! defined $self->{last_applied_time} || $self->{last_applied_time} eq "") {
       $self->add_nagios_critical("Unable to get archived log apply time");
     }
