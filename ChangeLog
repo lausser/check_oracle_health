@@ -1,3 +1,5 @@
+* 3.2.0.1 - 2019-10-07
+  improve tablespace-usage
 * 3.2 - 2019-06-24
   add mode num-scheduled-jobs
 * 3.1.2.2 - 2018-06-25

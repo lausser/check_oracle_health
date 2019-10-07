@@ -82,6 +82,9 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 1
         };
         my $tbs_sql = sprintf q{
+            WITH dba_free_space_mat AS (
+              SELECT /*+MATERIALIZE*/ * FROM dba_free_space
+            )
             SELECT /*+ opt_param('optimizer_adaptive_features','false') */
                 a.tablespace_name         "Tablespace",
                 b.status                  "Status",
@@ -113,7 +116,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                     a.tablespace_name,
                     SUM(a.bytes) bytes_free
                 FROM
-                    dba_free_space a
+                    dba_free_space_mat a
                 GROUP BY
                     tablespace_name
               ) c,
