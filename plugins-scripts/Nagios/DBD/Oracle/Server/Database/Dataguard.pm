@@ -28,23 +28,51 @@ sub init {
   my $self = shift;
   my %params = @_;
   $self->init_nagios();
+  ($self->{database_role}) =
+      $self->{handle}->fetchrow_array(q{
+          SELECT
+              name, database_role
+          FROM
+              v$database
+      });
   if ($params{mode} =~ /server::database::dataguard::lag/) {
     ($self->{last_applied_time}, $self->{lag_minutes}) =
         $self->{handle}->fetchrow_array(q{
-          select to_char(max(first_time),'YYYYMMDDHH24MISS')
-            , ceil((sysdate-max(first_time))*24*60)
-          from v$archived_log
-          where applied='YES' and registrar='RFS'
+          SELECT
+              TO_CHAR(MAX(first_time),'YYYYMMDDHH24MISS'),
+              CEIL((SYSDATE - MAX(first_time)) * 24 * 60)
+          FROM
+              v$archived_log
+          WHERE
+              applied NOT IN ('NO') AND registrar = 'RFS'
         });     
+#    ($self->{last_applied_time}, $self->{lag_minutes}) =
+#        $self->{handle}->fetchrow_array(q{
+#          -- returns NULL on the primary node
+#          SELECT
+#              SYSDATE +
+#              TO_NUMBER(SUBSTR(value, 2, 2)) +
+#              TO_NUMBER(SUBSTR(value, 5, 2)) / 24 +
+#              TO_NUMBER(SUBSTR(value, 8, 2)) / 24 / 60 AS max_first_time,
+#              ((TO_NUMBER(substr(value, 2, 2))) * 24 + TO_NUMBER(SUBSTR(value, 5, 2))) * 60 +
+#              TO_NUMBER(SUBSTR(value, 8, 2)) AS dg_apply_lag_minutes
+#          FROM
+#              V$DATAGUARD_STATS
+#          WHERE
+#              name = 'apply lag'
+#        });     
     if (! defined $self->{last_applied_time} || $self->{last_applied_time} eq "") {
       $self->add_nagios_critical("Unable to get archived log apply time");
     }
   } elsif ($params{mode} =~ /server::database::dataguard::mrp_status/) {
     ($self->{log_transport}) =
         $self->{handle}->fetchrow_array(q{
-          select decode(count(*),0,'ARCH','LGWR') as log_transport
-          from v$managed_standby
-          where client_process='LGWR'
+          SELECT
+              DECODE(COUNT(*),0,'ARCH','LGWR') AS log_transport
+          FROM
+              v$managed_standby
+          WHERE
+              client_process = 'LGWR'
         });     
     if (! defined $self->{log_transport}) {
       $self->add_nagios_critical("Unable to identify log transport method");
@@ -52,9 +80,12 @@ sub init {
 
     ($self->{mrp_process}, $self->{mrp_status}) =
         $self->{handle}->fetchrow_array(q{
-          select process, status
-          from v$managed_standby
-          where process like 'MR%'
+          SELECT
+              process, status
+          FROM
+              v$managed_standby
+          WHERE
+              process LIKE 'MR%'
         });     
     if (! defined $self->{mrp_process}) {
       $self->add_nagios_critical("Unable to find MRP process, managed recovery may be stopped");

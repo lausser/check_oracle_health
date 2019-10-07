@@ -1,3 +1,5 @@
+* 3.2.0.3 - 2019-10-07
+  bugfix in database-lag
 * 3.2.0.2 - 2019-10-07
   bugfix in failed-jobs
 * 3.2.0.1 - 2019-10-07
