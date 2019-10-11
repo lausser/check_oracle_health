@@ -1,3 +1,5 @@
+* 3.2.1 - 2019-10-10
+  add mode blocking-sessions (Thanks dbmasters.at for the sql)
 * 3.2.0.3 - 2019-10-07
   bugfix in database-lag
 * 3.2.0.2 - 2019-10-07

@@ -18,6 +18,7 @@ EXTRA_MODULES=\
   Nagios/DBD/Oracle/Server/Instance/PGA.pm \
   Nagios/DBD/Oracle/Server/Instance/Event.pm \
   Nagios/DBD/Oracle/Server/Instance/Enqueue.pm \
+  Nagios/DBD/Oracle/Server/Instance/Session.pm \
   Nagios/DBD/Oracle/Server/Instance/Sysstat.pm \
   Nagios/DBD/Oracle/Server/Instance.pm \
   Nagios/DBD/Oracle/Server/Database/User.pm \

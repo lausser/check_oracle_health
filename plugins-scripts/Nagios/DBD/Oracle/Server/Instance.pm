@@ -56,6 +56,14 @@ sub init {
     } else {
       $self->add_nagios_critical("unable to aquire enqueue info");
     }
+  } elsif ($params{mode} =~ /server::instance::session/) {
+    DBD::Oracle::Server::Instance::Session::init_sessions(%params);
+    if ($DBD::Oracle::Server::Instance::Session::initerrors) {
+      $self->add_nagios_critical("unable to aquire session info");
+    } else {
+      @{$self->{sessions}} =
+          @DBD::Oracle::Server::Instance::Session::sessions;
+    }
   } elsif ($params{mode} =~ /server::instance::connectedusers/) {
     $self->{connected_users} = $self->{handle}->fetchrow_array(q{
         SELECT COUNT(*) FROM v$session WHERE type = 'USER' 
@@ -71,12 +79,6 @@ sub init {
           status != 'RUNNING' 
         AND
           start_time > sysdate-3
-    });
-  } elsif ($params{mode} =~ /server::instance::sessionusage/) {
-    $self->{session_usage} = $self->{handle}->fetchrow_array(q{
-        SELECT current_utilization/limit_value*100 
-        FROM v$resource_limit WHERE resource_name = 'sessions'
-        -- FROM v$resource_limit WHERE resource_name LIKE '%sessions%'
     });
   } elsif ($params{mode} =~ /server::instance::processusage/) {
     $self->{process_usage} = $self->{handle}->fetchrow_array(q{
@@ -174,7 +176,9 @@ sub nagios {
       $self->add_perfdata(sprintf "rman_backup_problems=%d;%d;%d",
           $self->{rman_backup_problems},
           $self->{warningrange}, $self->{criticalrange});
-  } elsif ($params{mode} =~ /server::instance::sessionusage/) {
+  } elsif ($params{mode} =~ /server::instance::session::usage/) {
+      $self->{session_usage} =
+          $DBD::Oracle::Server::Instance::Session::session_usage;
       $self->add_nagios(
           $self->check_thresholds($self->{session_usage}, 80, 100),
           sprintf "%.2f%% of session resources used",
@@ -182,6 +186,18 @@ sub nagios {
       $self->add_perfdata(sprintf "session_usage=%.2f%%;%d;%d",
           $self->{session_usage},
           $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::session::blocked/) {
+    if (! @{$self->{sessions}}) {
+      $self->add_nagios_ok("no blocking sessions");
+    } else {
+      foreach (@{$self->{sessions}}) {
+        $_->nagios(%params);
+        $self->merge_nagios($_);
+      }
+      #if (! $self->{nagios_level} && ! $params{selectname}) {
+      #  $self->add_nagios_ok("no enqueue problem");
+      #}
+    }
   } elsif ($params{mode} =~ /server::instance::processusage/) {
       $self->add_nagios(
           $self->check_thresholds($self->{process_usage}, 80, 100),
