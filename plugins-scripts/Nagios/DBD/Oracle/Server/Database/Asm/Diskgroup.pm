@@ -105,8 +105,6 @@ sub init {
     my $tlen = 20;
     my $len = int((($params{mode} =~ /asm::diskgroup::usage/) ?
         $self->{percent_used} : $self->{percent_free} / 100 * $tlen) + 0.5);
-    $self->{percent_as_bar} = '=' x $len . '_' x ($tlen - $len);
-
   }
 }
 
@@ -137,10 +135,8 @@ sub nagios {
         if ($params{mode} =~ /server::database::asm::diskgroup::usage/) {
           $self->add_nagios(
               $self->check_thresholds($self->{percent_used}, "90", "98"),
-              $params{eyecandy} ?
-                  sprintf("[%s] %s", $self->{percent_as_bar}, $self->{name}) :
-                  sprintf("dg %s usage is %.2f%%",
-                      $self->{name}, $self->{percent_used})
+              sprintf("dg %s usage is %.2f%%",
+                  $self->{name}, $self->{percent_used})
           );
   
           $self->add_perfdata(sprintf "\'dg_%s_usage_pct\'=%.2f%%;%d;%d",

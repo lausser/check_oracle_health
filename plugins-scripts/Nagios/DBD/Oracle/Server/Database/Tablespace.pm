@@ -571,7 +571,6 @@ sub init {
       $self->{percent_used} = 0;
       $self->{real_bytes_max} = $self->{bytes};
       $self->{real_bytes_free} = $self->{bytes_free};
-      $self->{percent_as_bar} = '____________________';
     } else {
       if ($params{calcmeth} eq "classic") {
         # (total - free) / total * 100 = % used
@@ -606,7 +605,6 @@ sub init {
     my $tlen = 20;
     my $len = int((($params{mode} =~ /server::[c]*database::tablespace::usage/) ?
         $self->{percent_used} : $self->{percent_free} / 100 * $tlen) + 0.5);
-    $self->{percent_as_bar} = '=' x $len . '_' x ($tlen - $len);
   } elsif ($params{mode} =~ /server::database::tablespace::fragmentation/) {
   } elsif ($params{mode} =~ /server::database::tablespace::segment::top10/) {
     DBD::Oracle::Server::Database::Tablespace::Segment::init_segments(%params);
@@ -696,10 +694,8 @@ sub nagios {
             # 'tbs_system_usage_pct'=99.01%;90;98 percent used, warn, crit
             # 'tbs_system_usage'=693MB;630;686;0;700 used, warn, crit, 0, max=total
             $self->check_thresholds($self->{percent_used}, "90", "98"),
-            $params{eyecandy} ?
-                sprintf("[%s] %s", $self->{percent_as_bar}, $self->{name}) :
-                sprintf("tbs %s usage is %.2f%%",
-                    $self->{name}, $self->{percent_used})
+            sprintf("tbs %s usage is %.2f%%",
+                $self->{name}, $self->{percent_used})
         );
       }
       $self->add_perfdata(sprintf "\'tbs_%s_usage_pct\'=%.2f%%;%d;%d",
