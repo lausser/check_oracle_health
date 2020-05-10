@@ -67,43 +67,45 @@ sub init {
     }
   } elsif ($params{mode} =~
       /server::instance::sga::rollbacksegments::headercontention/) {
-    ($self->{undo_header_waits}, $self->{waits})  = $self->{handle}->fetchrow_array(q{
+    ($self->{undo_header_waits}, $self->{gets})  = $self->{handle}->fetchrow_array(q{
         SELECT ( 
           SELECT SUM(count)
           FROM v$waitstat
           WHERE class = 'undo header' OR class = 'system undo header'
         ) undo, (
-          SELECT SUM(count)
-          FROM v$waitstat
+          SELECT SUM(value)
+          FROM v$sysstat
+          WHERE name IN ('db block gets', 'consistent gets')
         ) complete
         FROM DUAL
     });
     if (! defined $self->{undo_header_waits}) {
       $self->add_nagios_critical("unable to get rollback segments wait stats");
     } else {
-      $self->valdiff(\%params, qw(undo_header_waits waits));
+      $self->valdiff(\%params, qw(undo_header_waits gets));
       $self->{rollback_segment_header_contention} =
-          $self->{delta_waits} ? 100 * $self->{delta_undo_header_waits} / $self->{delta_waits} : 0;
+          $self->{delta_gets} ? 100 * $self->{delta_undo_header_waits} / $self->{delta_gets} : 0;
     }
   } elsif ($params{mode} =~
       /server::instance::sga::rollbacksegments::blockcontention/) {
-    ($self->{undo_block_waits}, $self->{waits})  = $self->{handle}->fetchrow_array(q{
+    ($self->{undo_block_waits}, $self->{gets})  = $self->{handle}->fetchrow_array(q{
         SELECT ( 
           SELECT SUM(count)
           FROM v$waitstat
           WHERE class = 'undo block' OR class = 'system undo block'
         ) undo, (
-          SELECT SUM(count)
-          FROM v$waitstat
+          SELECT SUM(value)
+          FROM v$sysstat
+          WHERE name IN ('db block gets', 'consistent gets')
         ) complete
         FROM DUAL
     });
     if (! defined $self->{undo_block_waits}) { 
       $self->add_nagios_critical("unable to get rollback segments wait stats");
     } else {
-      $self->valdiff(\%params, qw(undo_block_waits waits));
+      $self->valdiff(\%params, qw(undo_block_waits gets));
       $self->{rollback_segment_block_contention} =
-          $self->{delta_waits} ? 100 * $self->{delta_undo_block_waits} / $self->{delta_waits} : 0;
+          $self->{delta_gets} ? 100 * $self->{delta_undo_block_waits} / $self->{delta_gets} : 0;
     }
   } elsif ($params{mode} =~
       /server::instance::sga::rollbacksegments::hitratio/) {
