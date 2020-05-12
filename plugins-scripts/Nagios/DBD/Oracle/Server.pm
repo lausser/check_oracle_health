@@ -816,6 +816,7 @@ sub save_state {
   my $self = shift;
   my %params = @_;
   my $extension = "";
+  my $statefile = "";
   my $mode = $params{mode};
   if ($params{connect} && $params{connect} =~ /(\w+)\/(\w+)@(\w+)/) {
     $params{connect} = $3;
@@ -839,7 +840,12 @@ sub save_state {
         $params{statefilesdir});
     return;
   }
-  my $statefile = sprintf "%s_%s", $params{connect}, $mode;
+  if ( $params{connect} =~ /.*sid=(\w+).*/i ) {
+    my ($sid_name) = $params{connect} =~ /.*sid=(\w+).*/mi;
+    $statefile = sprintf "%s_%s", $sid_name, $mode;
+  } else {
+    $statefile = sprintf "%s_%s", $params{connect}, $mode;
+  }
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";
   $extension .= $params{tablespace} ? "_".$params{tablespace} : "";
   $extension .= $params{datafile} ? "_".$params{datafile} : "";
@@ -870,6 +876,7 @@ sub load_state {
   my $self = shift;
   my %params = @_;
   my $extension = "";
+  my $statefile = "";
   my $mode = $params{mode};
   if ($params{connect} && $params{connect} =~ /(\w+)\/(\w+)@(\w+)/) {
     $params{connect} = $3;
@@ -881,7 +888,12 @@ sub load_state {
     $mode =~ s/::/_/g;
     $params{statefilesdir} = $self->system_vartmpdir();
   }
-  my $statefile = sprintf "%s_%s", $params{connect}, $mode;
+  if ( $params{connect} =~ /.*sid=(\w+).*/i ) {
+    my ($sid_name) = $params{connect} =~ /.*sid=(\w+).*/mi;
+    $statefile = sprintf "%s_%s", $sid_name, $mode;
+  } else {
+    $statefile = sprintf "%s_%s", $params{connect}, $mode;
+  }
   $extension .= $params{differenciator} ? "_".$params{differenciator} : "";
   $extension .= $params{tablespace} ? "_".$params{tablespace} : "";
   $extension .= $params{datafile} ? "_".$params{datafile} : "";
