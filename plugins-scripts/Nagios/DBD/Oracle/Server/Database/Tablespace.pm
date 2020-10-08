@@ -81,8 +81,12 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
             ORDER BY
                 1
         };
+        my $optimizer = "/*+ opt_param('optimizer_adaptive_features','false') */";
+        if (DBD::Oracle::Server::return_first_server()->version_is_minimum("12.2")) {
+          $optimizer = "";
+        }
         my $tbs_sql = sprintf q{
-            SELECT /*+ opt_param('optimizer_adaptive_features','false') */
+            SELECT %s
                 a.tablespace_name         "Tablespace",
                 b.status                  "Status",
                 b.contents                "Type",
@@ -126,7 +130,8 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                 AND a.tablespace_name = d.tablespace_name (+)
                 %s
             %s
-        }, $params{notemp} ? $tbs_sql_undo_empty : $tbs_sql_undo,
+        }, $optimizer,
+           $params{notemp} ? $tbs_sql_undo_empty : $tbs_sql_undo,
            $params{notemp} ? "AND (b.contents != 'TEMPORARY' AND b.contents != 'UNDO')" : "",
            $params{notemp} ? "" : $tbs_sql_temp;
         $tbs_sql = join "\n", grep !/^\s*$/, split(/\n/, $tbs_sql);
