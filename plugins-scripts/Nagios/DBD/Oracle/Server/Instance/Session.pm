@@ -11,6 +11,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
   our @sessions = ();
   our $initerrors = undef;
   our $session_usage = 0;
+  our $sessions_blocked = 0;
 
   sub add_session {
     push(@sessions, shift);
@@ -98,6 +99,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
             %thisparams);
         add_session($session);
         $num_sessions++;
+        $sessions_blocked++;
       }
       if (! $num_sessions && $params{mode} !~ /server::instance::session::blocked/) {
         $initerrors = 1;

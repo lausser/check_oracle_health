@@ -187,16 +187,19 @@ sub nagios {
           $self->{session_usage},
           $self->{warningrange}, $self->{criticalrange});
   } elsif ($params{mode} =~ /server::instance::session::blocked/) {
-    if (! @{$self->{sessions}}) {
-      $self->add_nagios_ok("no blocking sessions");
+    my $sessions_blocked = $DBD::Oracle::Server::Instance::Session::sessions_blocked;
+    if ($sessions_blocked == 0) {
+        $self->add_nagios_ok("no blocking sessions");
     } else {
+      $self->add_nagios(
+              $self->check_thresholds($sessions_blocked, 10, 50),
+              sprintf "%d blocking sessions found", $sessions_blocked);
+              $self->add_perfdata(sprintf "blocking_sessions=%d;%d;%d", $sessions_blocked, $self->{warningrange}, $self->{criticalrange}
+            );
       foreach (@{$self->{sessions}}) {
         $_->nagios(%params);
         $self->merge_nagios($_);
       }
-      #if (! $self->{nagios_level} && ! $params{selectname}) {
-      #  $self->add_nagios_ok("no enqueue problem");
-      #}
     }
   } elsif ($params{mode} =~ /server::instance::processusage/) {
       $self->add_nagios(
