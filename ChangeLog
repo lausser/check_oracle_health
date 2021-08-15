@@ -1,3 +1,7 @@
+* 3.2.1.6 - 2021-07-05
+  remove crap from a pull request. (and refuse pull requests from now on)
+* 3.2.1.5 - 2021-03-16
+  fix a bug in asm diskgroups (division by zero when dismounted)
 * 3.2.1.4 - 2020-12-07
   fix a bug in asm diskgroups (dismounted is no failure)
 * 3.2.1.3 - 2020-10-03

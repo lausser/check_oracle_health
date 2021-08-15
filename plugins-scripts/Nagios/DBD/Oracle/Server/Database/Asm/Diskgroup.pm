@@ -94,8 +94,13 @@ sub init {
   $self->init_nagios();
   $self->set_local_db_thresholds(%params);
   if ($params{mode} =~ /server::database::asm::diskgroup::(usage|free)/) {
-    $self->{percent_used} =
-	($self->{total_mb} - $self->{usable_file_mb}) / $self->{total_mb} * 100;
+    if ($self->{state} eq 'dismounted') {
+      # $total_mb, $usable_file_mb, $offline_disks = '0'
+      $self->{percent_used} = 100;
+    } else {
+      $self->{percent_used} =
+          ($self->{total_mb} - $self->{usable_file_mb}) / $self->{total_mb} * 100;
+    }
     $self->{used_file_mb} = $self->{total_mb} - $self->{usable_file_mb};
     $self->{percent_free} = 100 - $self->{percent_used};
     $self->{bytes_free} = $self->{usable_file_mb} * 1024 * 1024;
@@ -227,7 +232,7 @@ sub nagios {
           }
         }
       } elsif ($self->{state} eq 'dismounted') {
-        $self->add_nagios_ok("dg %s is dismounted", $self->{name});
+        $self->add_nagios_ok(sprintf "dg %s is dismounted", $self->{name});
       } else {
         $self->add_nagios(
           defined $params{mitigation} ? $params{mitigation} : 2,

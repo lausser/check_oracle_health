@@ -121,8 +121,6 @@ sub nagios {
       } else {
         $self->add_nagios_critical($mrp_message);
       }
-      $self->add_perfdata(sprintf "dataguard_mrp_status=%s", $self->{mrp_status});
-      $self->add_perfdata(sprintf "dataguard_log_transport=%s", $self->{log_transport});
     }
   }
 }
