@@ -101,8 +101,7 @@ sub nagios {
   } elsif ($self->{status} eq "EXPIRED(GRACE) & LOCKED") {
     $self->add_nagios_critical(sprintf "password of user %s soon expires and is locked",
         $self->{name});
-  }
-  if ($self->{status} eq "OPEN") {
+  } elsif ($self->{status} eq "OPEN") {
     if (defined $self->{valid_days}) {
       $self->add_nagios(
           $self->check_thresholds($self->{valid_days}, "7:", "3:"),
@@ -117,6 +116,9 @@ sub nagios {
       $self->add_perfdata(sprintf "\'pw_%s_valid\'=0;0;0",
           lc $self->{name});
     }
+  } else {
+    $self->add_nagios_unknown(sprintf "account %s has the status %s, please inform lausser",
+        $self->{name}, $self->{status});
   }
 }
 

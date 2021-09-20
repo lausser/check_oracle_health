@@ -1,3 +1,5 @@
+* 3.2.1.7 - 2021-09-20
+  catch undocumented values of account_status in mode password-expiration
 * 3.2.1.6 - 2021-07-05
   remove crap from a pull request. (and refuse pull requests from now on)
 * 3.2.1.5 - 2021-03-16
