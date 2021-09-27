@@ -83,7 +83,7 @@ sub nagios {
   } elsif ($self->{status} eq "EXPIRED (GRACE)") {
     $self->add_nagios_warning(sprintf "password of user %s soon expires",
         $self->{name});
-  } elsif ($self->{status} eq "LOCKED (TIMED)") {
+  } elsif ($self->{status} eq "LOCKED(TIMED)") {
     $self->add_nagios_warning(sprintf "user %s is temporarily locked",
         $self->{name});
   } elsif ($self->{status} eq "LOCKED") {

@@ -1,3 +1,5 @@
+* 3.2.1.8 - 2021-09-27
+  bugfix in password-expiration andlocked accounts
 * 3.2.1.7 - 2021-09-20
   catch undocumented values of account_status in mode password-expiration
 * 3.2.1.6 - 2021-07-05
