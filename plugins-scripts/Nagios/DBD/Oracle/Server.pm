@@ -55,6 +55,7 @@ sub new {
     negate => $params{negate},
     labelformat => $params{labelformat},
     uniquelabels => $params{uniquelabels},
+    morphmessage => $params{morphmessage},
     version => 'unknown',
     instance => undef,
     database => undef,
@@ -572,6 +573,17 @@ sub calculate_result {
         (uc $self->{negate}->{$from}) =~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/) {
       if ($self->{nagios_level} == $ERRORS{uc $from}) {
         $self->{nagios_level} = $ERRORS{uc $self->{negate}->{$from}};
+      }
+    }
+  }
+  if ($self->{morphmessage}) {
+    # 'Intel [R] Interface (\d+) usage'='nic$1'
+    # '^OK.*'="alles klar"   '^CRITICAL.*'="alles hi"
+    foreach my $key (keys %{$self->{morphmessage}}) {
+      if ($self->{nagios_message} =~ /$key/) {
+        my $replacement = '"'.$self->{morphmessage}->{$key}.'"';
+        $self->{nagios_message} =~ s/$key/$replacement/ee;
+printf "replace (%s) by (%s) in (%s)\n", $key, $replacement, $self->{nagios_message};
       }
     }
   }
