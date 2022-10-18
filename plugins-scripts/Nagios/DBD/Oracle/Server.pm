@@ -583,7 +583,6 @@ sub calculate_result {
       if ($self->{nagios_message} =~ /$key/) {
         my $replacement = '"'.$self->{morphmessage}->{$key}.'"';
         $self->{nagios_message} =~ s/$key/$replacement/ee;
-printf "replace (%s) by (%s) in (%s)\n", $key, $replacement, $self->{nagios_message};
       }
     }
   }
