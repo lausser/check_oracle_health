@@ -116,6 +116,8 @@ sub new {
       warningrange criticalrange)) {
     if (exists $params{$key}) {
       $self->{$key} = $params{$key};
+      $self->{$key} =~ s/^\s*//g if $self->{$key};
+      $self->{$key} =~ s/\s*$//g if $self->{$key};
     }
   }
   bless $self, $class;
@@ -136,10 +138,12 @@ sub nagios {
   my $self = shift;
   my %params = @_;
   if (! $self->{nagios_level}) {
-    if ($params{mode} =~ /server::instance::session::blocking/) {
+    if ($params{mode} =~ /server::instance::session::blocked/) {
+      my $user = $self->{username};
+      $user .= sprintf " (os-user: %s)", $self->{osuser};
       $self->add_nagios_critical(
-          sprintf "session %s of user %s/%s is blocking", 
-              $self->{sid}, $self->{username}, $self->{osuser});
+          sprintf "session %s of user %s is blocking since %ds",
+              $self->{sid}, $user, $self->{seconds_in_wait});
     }
   }
 }
