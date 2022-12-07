@@ -139,11 +139,19 @@ sub nagios {
   my %params = @_;
   if (! $self->{nagios_level}) {
     if ($params{mode} =~ /server::instance::session::blocked/) {
-      my $user = $self->{username};
-      $user .= sprintf " (os-user: %s)", $self->{osuser};
-      $self->add_nagios_critical(
-          sprintf "session %s of user %s is blocking since %ds",
-              $self->{sid}, $user, $self->{seconds_in_wait});
+      my $user = $self->{username} || "?";
+      my @annotations = ();
+      if ($self->{osuser}) {
+        push(@annotations, sprintf "os-user: %s", $self->{osuser});
+      }
+      if ($self->{blocking_session}) {
+        push(@annotations, sprintf "blocked by: %s", $self->{blocking_session});
+      }
+      $self->add_nagios(
+          $self->check_thresholds($self->{seconds_in_wait}, 60, 120),
+          sprintf("session %s of user %s is blocking since %ds%s",
+              $self->{sid}, $user, $self->{seconds_in_wait},
+              @annotations ? "(".join(", ", @annotations).")" : ""));
     }
   }
 }

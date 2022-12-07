@@ -1,3 +1,5 @@
+* 3.3.0.3 - 2022-11-30
+  make max blocking time configurable (--mode blocking-sessions --warning ...)
 * 3.3.0.2 - 2022-11-29
   bugfix in mode blocking-sessions
 * 3.3.0.1 - 2022-10-18
