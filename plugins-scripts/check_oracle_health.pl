@@ -243,6 +243,12 @@ my @modes = (
   ['server::instance::sysstat::listsysstats',
       'list-sysstats', undef,
       'convenience function which lists all statistics from v$sysstat' ],
+  ['server::instance::systimemodel::rate',
+      'systimemodel', undef,
+      'change of systimemodel values over time' ],
+  ['server::instance::sysstat::listsystimemodel',
+      'list-systimemodel', undef,
+      'convenience function which lists all statistics from v$systimemodel' ],
 );
 
 sub print_usage () {
