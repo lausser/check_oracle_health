@@ -246,7 +246,7 @@ my @modes = (
   ['server::instance::systimemodel::rate',
       'systimemodel', undef,
       'change of systimemodel values over time' ],
-  ['server::instance::sysstat::listsystimemodel',
+  ['server::instance::systimemodel::listsystimemodel',
       'list-systimemodel', undef,
       'convenience function which lists all statistics from v$systimemodel' ],
 );
