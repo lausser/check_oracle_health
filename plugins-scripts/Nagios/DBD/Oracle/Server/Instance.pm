@@ -40,6 +40,22 @@ sub init {
     } else {
       $self->add_nagios_critical("unable to aquire sysstats info");
     }
+  } elsif ($params{mode} =~ /server::instance::systimemodel/) {
+    DBD::Oracle::Server::Instance::SysTimeModel::init_systimemodel(%params);
+    if (my @systimemodel =
+        DBD::Oracle::Server::Instance::SysTimeModel::return_systimemodel(%params)) {
+      $self->{systimemodel} = \@systimemodel;
+    } else {
+      $self->add_nagios_critical("unable to aquire systimemodel info");
+    }
+  }  elsif ($params{mode} =~ /server::instance::syswaitclass/) {
+    DBD::Oracle::Server::Instance::SysWaitClass::init_syswaitclass(%params);
+    if (my @syswaitclass =
+        DBD::Oracle::Server::Instance::SysWaitClass::return_syswaitclass(%params)) {
+      $self->{syswaitclass} = \@syswaitclass;
+    } else {
+      $self->add_nagios_critical("unable to aquire syswaitclass info");
+    }
   } elsif ($params{mode} =~ /server::instance::event/) {
     DBD::Oracle::Server::Instance::Event::init_events(%params);
     if (my @events =
@@ -146,6 +162,32 @@ sub nagios {
     }
     if (! $self->{nagios_level} && ! $params{selectname}) {
       $self->add_nagios_ok("no wait problems");
+    }
+  } elsif ($params{mode} =~ /server::instance::systimemodel::listsystimemodel/) {
+    foreach (sort { $a->{name} cmp $b->{name} } @{$self->{systimemodel}}) {
+      printf "%10d %s\n", $_->{number}, $_->{name};
+    }
+    $self->add_nagios_ok("have fun");
+  } elsif ($params{mode} =~ /server::instance::systimemodel/) {
+    foreach (@{$self->{systimemodel}}) {
+      $_->nagios(%params);
+      $self->merge_nagios($_);
+    }
+    if (! $self->{nagios_level} && ! $params{selectname}) {
+      $self->add_nagios_ok("no time model problems");
+    }
+  } elsif ($params{mode} =~ /server::instance::syswaitclass::listsyswaitclass/) {
+    foreach (sort { $a->{name} cmp $b->{name} } @{$self->{syswaitclass}}) {
+      printf "%10d %s\n", $_->{number}, $_->{name};
+    }
+    $self->add_nagios_ok("have fun");
+  } elsif ($params{mode} =~ /server::instance::syswaitclass/) {
+    foreach (@{$self->{syswaitclass}}) {
+      $_->nagios(%params);
+      $self->merge_nagios($_);
+    }
+    if (! $self->{nagios_level} && ! $params{selectname}) {
+      $self->add_nagios_ok("no wait class problems");
     }
   } elsif ($params{mode} =~ /server::instance::enqueue::listenqueues/) {
     foreach (sort { $a->{name} cmp $b->{name} } @{$self->{enqueues}}) {

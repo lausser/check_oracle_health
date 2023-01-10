@@ -243,6 +243,19 @@ my @modes = (
   ['server::instance::sysstat::listsysstats',
       'list-sysstats', undef,
       'convenience function which lists all statistics from v$sysstat' ],
+  ['server::instance::systimemodel::rate',
+      'systimemodel', undef,
+      'change of systimemodel values over time' ],
+  ['server::instance::systimemodel::listsystimemodel',
+      'list-systimemodel', undef,
+      'convenience function which lists all statistics from v$syswaitclass' ],
+  ['server::instance::syswaitclass::rate',
+      'syswaitclass', undef,
+      'change of syswaitclass values over time' ],
+  ['server::instance::syswaitclass::listsyswaitclass',
+      'list-syswaitclass', undef,
+      'convenience function which lists all statistics from v$syswaitclass' ],
+
 );
 
 sub print_usage () {
