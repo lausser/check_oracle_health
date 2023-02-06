@@ -45,8 +45,16 @@ sub init {
       $self->add_nagios_critical("unable to aquire tablespace info");
     }
   } elsif ($params{mode} =~ /server::[c]*database::flash_recovery_area/) {
+    my $has_flash = "NO";
+    if ($self->version_is_minimum("10.x")) {
+      $has_flash = $params{handle}->fetchrow_array(q{
+          select FLASHBACK_ON from v$database;
+      });
+    }
     DBD::Oracle::Server::Database::FlashRecoveryArea::init_flash_recovery_areas(%params);
-    if (my @flash_recovery_areas = 
+    if ($has_flash eq "NO") {
+      $self->add_nagios_ok("flashback is not enabled");
+    } elsif (my @flash_recovery_areas = 
         DBD::Oracle::Server::Database::FlashRecoveryArea::return_flash_recovery_areas()) {
       $self->{flash_recovery_areas} = \@flash_recovery_areas;
     } else {
