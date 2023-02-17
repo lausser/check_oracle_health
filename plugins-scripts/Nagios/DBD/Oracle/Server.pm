@@ -184,6 +184,10 @@ sub init {
     }
   } elsif ($params{mode} =~ /^server::connectiontime/) {
     $self->{connection_time} = $self->{tac} - $self->{tic};
+  } elsif ($params{mode} =~ /^server::uptime/) {
+    $self->{uptime} = $self->{handle}->fetchrow_array(q{
+        select trunc(1440*((sysdate - startup_time) - trunc(sysdate - startup_time))) from gv$instance
+    });
   } elsif ($params{mode} =~ /^my::([^:.]+)/) {
     my $class = $1;
     my $loaderror = undef;
@@ -257,6 +261,15 @@ sub nagios {
       $self->add_perfdata(sprintf "connection_time=%.4f;%d;%d",
           $self->{connection_time},
           $self->{warningrange}, $self->{criticalrange});
+    } elsif ($params{mode} =~ /^server::uptime/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{uptime}, "10:", "5:"),
+          sprintf "database is up since %.0f minute(s)",
+              $self->{uptime}, $self->{dbuser}||$self->{username});
+      {no warnings 'numeric'; # to display thresholds in perfdata
+      $self->add_perfdata(sprintf "uptime=%.0f;%d;%d",
+          $self->{uptime},
+          $self->{warningrange}, $self->{criticalrange})};
     } elsif ($params{mode} =~ /^server::sqlruntime/) {
       $self->add_nagios(
           $self->check_thresholds($self->{runtime}, 1, 5),
