@@ -412,6 +412,7 @@ my @params = (
     "commit",
     "labelformat=s",
     "uniquelabels",
+    "morphmessage=s%",
     "extra-opts:s");
 
 if (! GetOptions(\%commandline, @params)) {
@@ -738,6 +739,7 @@ my %params = (
     calcmeth => $commandline{calcmeth},
     labelformat => $commandline{labelformat},
     uniquelabels => $commandline{uniquelabels},
+    morphmessage => $commandline{morphmessage},
     negate => $commandline{negate},
 );
 

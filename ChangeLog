@@ -1,3 +1,22 @@
+* 3.3.2 - 2023-02-06
+  check if flashback is enabled
+* 3.3.1 - 2023-01-12
+  runtime of tablespace-can-allocate-next was drastically reduced, thanks to
+  Peter from eckel-edv.de
+* 3.3.0.3 - 2022-11-30
+  make max blocking time configurable (--mode blocking-sessions --warning ...)
+* 3.3.0.2 - 2022-11-29
+  bugfix in mode blocking-sessions
+* 3.3.0.1 - 2022-10-18
+  remove a leftover print statement
+* 3.3 - 2022-10-18
+  add parameter --morphmessage
+* 3.2.1.9 - 2022-06.22
+  bugfix in invalid-objects
+* 3.2.1.8 - 2021-09-27
+  bugfix in password-expiration andlocked accounts
+* 3.2.1.7 - 2021-09-20
+  catch undocumented values of account_status in mode password-expiration
 * 3.2.1.6 - 2021-07-05
   remove crap from a pull request. (and refuse pull requests from now on)
 * 3.2.1.5 - 2021-03-16

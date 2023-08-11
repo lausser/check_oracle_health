@@ -44,85 +44,91 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
     } elsif ($params{mode} =~
         /server::database::tablespace::segment::extendspace/) {
       my @tablespaceresult = $params{handle}->fetchall_array(q{
-          SELECT
-              -- tablespace, segment, extent
-              -- aber dadurch, dass nur das letzte extent selektiert wird
-              -- werden praktisch nur tablespace und segmente ausgegeben
-              b.tablespace_name "Tablespace",
-              b.segment_type "Type",
-              SUBSTR(ext.owner||'.'||ext.segment_name,1,50) "Object Name",
-              DECODE(freespace.extent_management, 
-                'DICTIONARY', DECODE(b.extents, 
-                  1, b.next_extent, ext.bytes * (1 + b.pct_increase / 100)),
-                  'LOCAL', DECODE(freespace.allocation_type,
-                    'UNIFORM', freespace.initial_extent,
-                    'SYSTEM', ext.bytes)
-              ) "Required Extent",
-              freespace.largest "MaxAvail"
-          FROM
-              -- dba_segments b,
-              -- dba_extents ext,
-              (
-                SELECT
-                    owner, segment_type, segment_name, extents, pct_increase,
-                    next_extent, tablespace_name
-                FROM
-                    dba_segments
-                WHERE
-                    tablespace_name = ?
-              ) b,
-              (
-                SELECT
-                    owner, segment_type, segment_name, extent_id, bytes,
-                    tablespace_name
-                FROM
-                    dba_extents
-                WHERE
-                    tablespace_name = ?
-              ) ext,
-              (
-                -- dictionary/local, uniform/system, initial, next
-                -- und der groesste freie extent pro tablespace
-                SELECT
-                    b.tablespace_name,
-                    b.extent_management,
-                    b.allocation_type,
-                    b.initial_extent,
-                    b.next_extent,
-                    max(a.bytes) largest
-                FROM
-                    dba_free_space a,
-                    dba_tablespaces b
-                WHERE
-                    b.tablespace_name = a.tablespace_name
-                AND
-                    b.status = 'ONLINE'
-                GROUP BY
-                    b.tablespace_name,
-                    b.extent_management,
-                    b.allocation_type,
-                    b.initial_extent,
-                    b.next_extent
-              ) freespace
-          WHERE
-              b.owner = ext.owner
-          AND
-              b.segment_type = ext.segment_type
-          AND
-              b.segment_name = ext.segment_name
-          AND
-              b.tablespace_name = ext.tablespace_name
-          AND
-              -- so landet nur das jeweils letzte extent im ergebnis
-              (b.extents - 1) = ext.extent_id
-          AND
-              b.tablespace_name = freespace.tablespace_name
-          AND
-              freespace.tablespace_name = ?
-          ORDER BY
-              b.tablespace_name,
-              b.segment_type,
-              b.segment_name
+          SELECT tablespace_name "Tablespace",
+                 segment_type "Type",
+                 SUBSTR(owner||'.'||segment_name,1,50) "Object Name",
+                 required_extent "Required Extent",
+                 max_avail "MaxAvail"
+          FROM (
+              SELECT
+                  b.tablespace_name AS tablespace_name,
+                  b.segment_type AS segment_type,
+                  ext.owner AS owner,
+                  ext.segment_name AS segment_name,
+                  MAX(
+                      DECODE(freespace.extent_management,
+                        'DICTIONARY', DECODE(b.extents,
+                          1, b.next_extent, ext.bytes * (1 + b.pct_increase / 100)),
+                          'LOCAL', DECODE(freespace.allocation_type,
+                            'UNIFORM', freespace.initial_extent,
+                            'SYSTEM', ext.bytes)
+                      )
+                  ) AS required_extent,
+                  freespace.largest as max_avail
+              FROM
+                  (
+                    SELECT
+                        owner, segment_type, segment_name, partition_name,
+                        extents, pct_increase, next_extent, tablespace_name
+                    FROM
+                        dba_segments
+                    WHERE
+                        tablespace_name = ?
+                  ) b,
+                  (
+                    SELECT
+                        owner, segment_type, segment_name, partition_name,
+                        extent_id, bytes, tablespace_name
+                    FROM
+                        dba_extents
+                    WHERE
+                        tablespace_name = ?
+                  ) ext,
+                  (
+                    SELECT
+                        b.tablespace_name,
+                        b.extent_management,
+                        b.allocation_type,
+                        b.initial_extent,
+                        b.next_extent,
+                        max(a.bytes) largest
+                    FROM
+                        dba_free_space a,
+                        dba_tablespaces b
+                    WHERE
+                        b.tablespace_name = a.tablespace_name
+                    AND
+                        b.status = 'ONLINE'
+                    GROUP BY
+                        b.tablespace_name,
+                        b.extent_management,
+                        b.allocation_type,
+                        b.initial_extent,
+                        b.next_extent
+                  ) freespace
+              WHERE
+                  b.owner = ext.owner
+              AND
+                  b.segment_type = ext.segment_type
+              AND
+                  b.segment_name = ext.segment_name
+              AND
+                  b.partition_name = ext.partition_name
+              AND
+                  b.tablespace_name = ext.tablespace_name
+              AND
+                  (b.extents - 1) = ext.extent_id
+              AND
+                  b.tablespace_name = freespace.tablespace_name
+              AND
+                  freespace.tablespace_name = ?
+              GROUP BY
+                  b.tablespace_name, b.segment_type, ext.owner,
+                  ext.segment_name, freespace.largest
+              ORDER BY
+                  b.tablespace_name,
+                  b.segment_type
+          )
       }, $params{tablespace}, $params{tablespace}, $params{tablespace});
       foreach (@tablespaceresult) {
         my ($tablespace_name, $segment_type, $object_name, 

@@ -45,8 +45,16 @@ sub init {
       $self->add_nagios_critical("unable to aquire tablespace info");
     }
   } elsif ($params{mode} =~ /server::[c]*database::flash_recovery_area/) {
+    my $has_flash = "NO";
+    if ($self->version_is_minimum("10.x")) {
+      $has_flash = $params{handle}->fetchrow_array(q{
+          select FLASHBACK_ON from v$database;
+      });
+    }
     DBD::Oracle::Server::Database::FlashRecoveryArea::init_flash_recovery_areas(%params);
-    if (my @flash_recovery_areas = 
+    if ($has_flash eq "NO") {
+      $self->add_nagios_ok("flashback is not enabled");
+    } elsif (my @flash_recovery_areas = 
         DBD::Oracle::Server::Database::FlashRecoveryArea::return_flash_recovery_areas()) {
       $self->{flash_recovery_areas} = \@flash_recovery_areas;
     } else {
@@ -151,14 +159,14 @@ sub init_invalid_objects {
         $self->{handle}->fetchall_array(q{
             SELECT 'dba_registry', namespace||'.'||comp_name||'-'||version||' is '||status
             FROM dba_registry
-            WHERE status <> 'VALID' AND status <> 'OPTION OFF'
+            WHERE status <> 'VALID' AND status NOT IN ('OPTION OFF', 'REMOVED')
         });
   } else {
     @{$self->{invalidobjects}->{invalid_registry_components_list}} =
         $self->{handle}->fetchall_array(q{
             SELECT 'dba_registry', 'SCHEMA.'||comp_name||'-'||version||' is '||status
             FROM dba_registry
-            WHERE status <> 'VALID' AND status <> 'OPTION OFF'
+            WHERE status <> 'VALID' AND status NOT IN ('OPTION OFF', 'REMOVED')
         });
   }
   if (! defined $self->{invalidobjects}->{invalid_objects} ||
