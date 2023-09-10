@@ -51,14 +51,17 @@ sub init {
           select FLASHBACK_ON from v$database;
       });
     }
-    DBD::Oracle::Server::Database::FlashRecoveryArea::init_flash_recovery_areas(%params);
     if ($has_flash eq "NO") {
       $self->add_nagios_ok("flashback is not enabled");
-    } elsif (my @flash_recovery_areas = 
-        DBD::Oracle::Server::Database::FlashRecoveryArea::return_flash_recovery_areas()) {
-      $self->{flash_recovery_areas} = \@flash_recovery_areas;
+      $self->{flash_recovery_areas} = [];
     } else {
-      $self->add_nagios_critical("unable to aquire flash recovery area info");
+      DBD::Oracle::Server::Database::FlashRecoveryArea::init_flash_recovery_areas(%params);
+      if (my @flash_recovery_areas = 
+          DBD::Oracle::Server::Database::FlashRecoveryArea::return_flash_recovery_areas()) {
+        $self->{flash_recovery_areas} = \@flash_recovery_areas;
+      } else {
+        $self->add_nagios_critical("unable to aquire flash recovery area info");
+      }
     }
   } elsif ($params{mode} =~ /server::database::dataguard/) {
     $self->{dataguard} = DBD::Oracle::Server::Database::Dataguard->new(%params);
