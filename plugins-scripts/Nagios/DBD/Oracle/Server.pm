@@ -184,6 +184,14 @@ sub init {
     }
   } elsif ($params{mode} =~ /^server::connectiontime/) {
     $self->{connection_time} = $self->{tac} - $self->{tic};
+  } elsif ($params{mode} =~ /^server::uptime/) {
+    ($self->{starttime}, $self->{uptime}) = $self->{handle}->fetchrow_array(q{
+      SELECT
+          TO_CHAR(STARTUP_TIME, 'YYYY-MM-DD"T"HH24:MI:SS') AS STARTUP_TIME_ISO8601,
+          ROUND((SYSDATE - STARTUP_TIME) * 24 * 60 * 60) AS UPTIME_SECONDS
+      FROM
+          sys.v_$instance;
+    });
   } elsif ($params{mode} =~ /^my::([^:.]+)/) {
     my $class = $1;
     my $loaderror = undef;
@@ -256,6 +264,13 @@ sub nagios {
               $self->{connection_time}, $self->{dbuser}||$self->{username});
       $self->add_perfdata(sprintf "connection_time=%.4f;%d;%d",
           $self->{connection_time},
+          $self->{warningrange}, $self->{criticalrange});
+    } elsif ($params{mode} =~ /^server::uptime/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{uptime}, "900:", "300:"),
+          sprintf("server started at %s", $self->{starttime}));
+      $self->add_perfdata(sprintf "uptime=%d;%s;%s",
+          $self->{uptime},
           $self->{warningrange}, $self->{criticalrange});
     } elsif ($params{mode} =~ /^server::sqlruntime/) {
       $self->add_nagios(

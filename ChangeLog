@@ -1,3 +1,5 @@
+* 3.3.3 - 2024-01-05
+  add mode uptime
 * 3.3.2.1 - 2023-02-07
   bugfix in flash-recovery-area-*
   negate based on regexp
