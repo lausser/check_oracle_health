@@ -586,6 +586,17 @@ sub calculate_result {
       }
     }
   }
+  foreach my $from (keys %{$self->{negate}}) {
+    # negate again: --negate "CRITICAL - Unable to get archived log apply time"=ok
+    if ((uc $from) !~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/ &&
+        (uc $self->{negate}->{$from}) =~ /^(OK|WARNING|CRITICAL|UNKNOWN)$/) {
+      if ($self->{nagios_message} =~ /$from/) {
+        $self->{nagios_level} = $ERRORS{uc $self->{negate}->{$from}};
+        my $newcode = uc $self->{negate}->{$from};
+        $self->{nagios_message} =~ s/^.*? -/$newcode -/;
+      }
+    }
+  }
   if ($self->{labelformat} eq "pnp4nagios") {
     $self->{perfdata} = join(" ", @{$self->{nagios}->{perfdata}});
   } else {

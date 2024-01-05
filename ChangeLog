@@ -1,3 +1,6 @@
+* 3.3.2.1 - 2023-02-07
+  bugfix in flash-recovery-area-*
+  negate based on regexp
 * 3.3.2 - 2023-02-06
   check if flashback is enabled
 * 3.3.1 - 2023-01-12
