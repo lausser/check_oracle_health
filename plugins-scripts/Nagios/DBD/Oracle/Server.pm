@@ -268,7 +268,7 @@ sub nagios {
     } elsif ($params{mode} =~ /^server::uptime/) {
       $self->add_nagios(
           $self->check_thresholds($self->{uptime}, "900:", "300:"),
-          sprintf("server started at %s", $self->{starttime}));
+          sprintf("instance started at %s", $self->{starttime}));
       $self->add_perfdata(sprintf "uptime=%d;%s;%s",
           $self->{uptime},
           $self->{warningrange}, $self->{criticalrange});
