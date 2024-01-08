@@ -190,7 +190,7 @@ sub init {
           TO_CHAR(STARTUP_TIME, 'YYYY-MM-DD"T"HH24:MI:SS') AS STARTUP_TIME_ISO8601,
           ROUND((SYSDATE - STARTUP_TIME) * 24 * 60 * 60) AS UPTIME_SECONDS
       FROM
-          sys.v_$instance;
+          sys.v_$instance
     });
   } elsif ($params{mode} =~ /^my::([^:.]+)/) {
     my $class = $1;

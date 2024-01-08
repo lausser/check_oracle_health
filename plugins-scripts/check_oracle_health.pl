@@ -38,7 +38,7 @@ my @modes = (
       'Time to connect to the server' ],
   ['server::uptime',
       'uptime', undef,
-      'Time elapsed since the server started' ],
+      'Time elapsed since the instance started' ],
   ['server::database::expiredpw',
       'password-expiration', undef,
       'Check the password expiry date for users' ],

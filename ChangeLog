@@ -1,3 +1,5 @@
+* 3.3.3.2 - 2024-01-08
+  bugfix in uptime
 * 3.3.3.1 - 2024-01-08
   server->instance in mode uptime
 * 3.3.3 - 2024-01-05
