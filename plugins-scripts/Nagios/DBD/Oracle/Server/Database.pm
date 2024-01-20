@@ -137,6 +137,10 @@ sub init_invalid_objects {
           SELECT 'dba_indexes', index_type||' index '||owner||'.'||index_name||' of '||table_owner||'.'||table_name||' is '||status
           FROM dba_indexes
           WHERE status <> 'VALID' AND status <> 'N/A'
+          UNION
+          SELECT 'dba_indexes', index_type||' index '||owner||'.'||index_name||' of '||table_owner||'.'||table_name||' is domain status '||DOMIDX_STATUS||' and domain opstatus '||DOMIDX_OPSTATUS
+          FROM dba_indexes
+          WHERE status = 'VALID' AND ( DOMIDX_STATUS <> 'VALID' OR DOMIDX_OPSTATUS <> 'VALID')
       });
   # should be only USABLE
   @{$self->{invalidobjects}->{invalid_ind_partitions_list}} =
