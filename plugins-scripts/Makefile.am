@@ -20,6 +20,8 @@ EXTRA_MODULES=\
   Nagios/DBD/Oracle/Server/Instance/Enqueue.pm \
   Nagios/DBD/Oracle/Server/Instance/Session.pm \
   Nagios/DBD/Oracle/Server/Instance/Sysstat.pm \
+  Nagios/DBD/Oracle/Server/Instance/SysTimeModel.pm \
+  Nagios/DBD/Oracle/Server/Instance/SysWaitClass.pm \
   Nagios/DBD/Oracle/Server/Instance.pm \
   Nagios/DBD/Oracle/Server/Database/User.pm \
   Nagios/DBD/Oracle/Server/Database/Dataguard.pm \

@@ -32,15 +32,16 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
                   type,
                   total_mb,
                   usable_file_mb,
+                  required_mirror_free_mb,
                   offline_disks
           FROM
                   V$ASM_DISKGROUP
-  
+
     });
   
     if ($params{mode} =~ /server::database::asm::diskgroup::(usage|free|listdiskgroups)/) {
         foreach (@diskgroupresult) {
-          my ($name, $state, $type, $total_mb, $usable_file_mb, $offline_disks) = @{$_};
+          my ($name, $state, $type, $total_mb, $usable_file_mb, $required_mirror_free_mb, $offline_disks) = @{$_};
           if ($params{regexp}) {
             next if $params{selectname} && $name !~ /$params{selectname}/;
           } else {
@@ -53,6 +54,7 @@ my %ERRORCODES=( 0 => 'OK', 1 => 'WARNING', 2 => 'CRITICAL', 3 => 'UNKNOWN' );
           $thisparams{type} = lc $type;
           $thisparams{total_mb} = $total_mb;
           $thisparams{usable_file_mb} = $usable_file_mb;
+          $thisparams{required_mirror_free_mb} = $required_mirror_free_mb;
           $thisparams{offline_disks} = $offline_disks;
   
           my $diskgroup = DBD::Oracle::Server::Database::Asm::Diskgroup->new(
@@ -79,6 +81,7 @@ sub new {
     type => $params{type},
     total_mb => $params{total_mb},
     usable_file_mb => $params{usable_file_mb},
+    required_mirror_free_mb => $params{required_mirror_free_mb},
     offline_disks => $params{offline_disks},
     warningrange => $params{warningrange},
     criticalrange => $params{criticalrange},
@@ -94,17 +97,22 @@ sub init {
   $self->init_nagios();
   $self->set_local_db_thresholds(%params);
   if ($params{mode} =~ /server::database::asm::diskgroup::(usage|free)/) {
+    my $mirror_factor = ($self->{type} eq 'high') ? 3 :
+                        ($self->{type} eq 'normal') ? 2 : 1;
+    my $effective_total = ($self->{total_mb} - $self->{required_mirror_free_mb})
+                          / $mirror_factor;
+    $self->{effective_total_mb} = $effective_total;
     if ($self->{state} eq 'dismounted') {
       # $total_mb, $usable_file_mb, $offline_disks = '0'
       $self->{percent_used} = 100;
     } else {
       $self->{percent_used} =
-          ($self->{total_mb} - $self->{usable_file_mb}) / $self->{total_mb} * 100;
+          ($effective_total - $self->{usable_file_mb}) / $effective_total * 100;
     }
-    $self->{used_file_mb} = $self->{total_mb} - $self->{usable_file_mb};
+    $self->{used_file_mb} = $effective_total - $self->{usable_file_mb};
     $self->{percent_free} = 100 - $self->{percent_used};
     $self->{bytes_free} = $self->{usable_file_mb} * 1024 * 1024;
-    $self->{bytes_max} = $self->{total_mb} * 1024 * 1024;
+    $self->{bytes_max} = $effective_total * 1024 * 1024;
     $self->{bytes_used} = $self->{used_file_mb} * 1024 * 1024;
 
     my $tlen = 20;
@@ -151,12 +159,12 @@ sub nagios {
           $self->add_perfdata(sprintf "\'dg_%s_usage\'=%dMB;%d;%d;%d;%d",
               lc $self->{name},
               $self->{used_file_mb},
-              $self->{warningrange} * $self->{total_mb} / 100,
-              $self->{criticalrange} * $self->{total_mb} / 100,
-              0, $self->{total_mb});
+              $self->{warningrange} * $self->{effective_total_mb} / 100,
+              $self->{criticalrange} * $self->{effective_total_mb} / 100,
+              0, $self->{effective_total_mb});
           $self->add_perfdata(sprintf "\'dg_%s_size\'=%dMB",
               lc $self->{name},
-              $self->{total_mb});
+              $self->{effective_total_mb});
         } elsif ($params{mode} =~ /server::database::asm::diskgroup::free/) {
           if (! $params{units}) {
             $params{units} = "%";
