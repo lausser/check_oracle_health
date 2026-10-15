@@ -80,6 +80,57 @@ sub init {
         AND
           start_time > sysdate-3
     });
+  } elsif ($params{mode} =~ /server::instance::rman::full_backup_age/) {
+    $self->{full_backup_age} = $self->{handle}->fetchrow_array(q{
+        WITH age AS (
+          SELECT MAX(age) age
+          FROM (
+            SELECT
+              vdf.file#,
+              TRUNC(TO_NUMBER(SYSDATE - MAX(NVL(vbd.checkpoint_time, vdf.creation_time))) * 24) age
+            FROM v$backup_datafile vbd
+            RIGHT OUTER JOIN v$datafile vdf ON vbd.file# = vdf.file#
+            WHERE vdf.enabled <> 'READ ONLY'
+            GROUP BY vdf.file#
+          )
+        ),
+        backup_running AS (
+          SELECT COUNT(*) count
+          FROM v$rman_status
+          WHERE status = 'RUNNING'
+            AND operation = 'BACKUP'
+            AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
+        )
+        SELECT CASE
+          WHEN backup_running.count > 0 THEN 0
+          WHEN vd.database_role <> 'PRIMARY' THEN 0
+          ELSE age.age
+        END backup_age
+        FROM age, backup_running, v$database vd
+    });
+  } elsif ($params{mode} =~ /server::instance::rman::arch_backup_age/) {
+    $self->{arch_backup_age} = $self->{handle}->fetchrow_array(q{
+        WITH arch_backup_age AS (
+          SELECT TRUNC(TO_NUMBER(SYSDATE - MIN(next_time)) * 24) age
+          FROM v$archived_log
+          WHERE backup_count = 0
+            AND deleted = 'NO'
+            AND standby_dest = 'NO'
+            AND archived = 'YES'
+        ),
+        backup_running AS (
+          SELECT COUNT(*) count
+          FROM v$rman_status
+          WHERE status = 'RUNNING'
+            AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL', 'ARCHIVELOG')
+        )
+        SELECT CASE
+          WHEN backup_running.count > 0 THEN 0
+          WHEN vd.database_role <> 'PRIMARY' THEN 0
+          ELSE NVL(arch_backup_age.age, 0)
+        END arch_backup_age
+        FROM arch_backup_age, backup_running, v$database vd
+    });
   } elsif ($params{mode} =~ /server::instance::processusage/) {
     $self->{process_usage} = $self->{handle}->fetchrow_array(q{
         SELECT current_utilization/limit_value*100 
@@ -175,6 +226,22 @@ sub nagios {
               $self->{rman_backup_problems});
       $self->add_perfdata(sprintf "rman_backup_problems=%d;%d;%d",
           $self->{rman_backup_problems},
+          $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::rman::full_backup_age/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{full_backup_age}, 28, 32),
+          sprintf "%d hours since the last successful database backup",
+              $self->{full_backup_age});
+      $self->add_perfdata(sprintf "full_backup_age=%d;%s;%s",
+          $self->{full_backup_age},
+          $self->{warningrange}, $self->{criticalrange});
+  } elsif ($params{mode} =~ /server::instance::rman::arch_backup_age/) {
+      $self->add_nagios(
+          $self->check_thresholds($self->{arch_backup_age}, 4, 8),
+          sprintf "%d hours since the last successful archivelog backup",
+              $self->{arch_backup_age});
+      $self->add_perfdata(sprintf "arch_backup_age=%d;%s;%s",
+          $self->{arch_backup_age},
           $self->{warningrange}, $self->{criticalrange});
   } elsif ($params{mode} =~ /server::instance::session::usage/) {
       $self->{session_usage} =
