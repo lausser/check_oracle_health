@@ -1219,7 +1219,7 @@ sub init {
         $username = '';
       } elsif ($self->{username} eq "sys") {
         $connecthash = $sysdba_connecthash;
-      } elsif ($self->{username} =~ /^([\w#\-\._]+)@(sysdba)/) {
+      } elsif ($self->{username} =~ /^([\w#\$\-\.]+)@(sysdba)/) {
         $username = $1;
         $connecthash = $sysdba_connecthash;
       }
