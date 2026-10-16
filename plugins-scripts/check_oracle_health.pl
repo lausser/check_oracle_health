@@ -57,12 +57,12 @@ my @modes = (
   ['server::instance::rman::backup::problems',
       'rman-backup-problems', undef,
       'Number of rman backup errors during the last 3 days' ],
-  ['server::instance::rman::full_backup_age',
-      'full-backup-age', undef,
-      'Age in hours of the oldest datafile backup' ],
-  ['server::instance::rman::arch_backup_age',
-      'arch-backup-age', undef,
-      'Age in hours of the oldest unbacked archived log' ],
+  ['server::instance::rman::rman_datafile_backup_age',
+      'rman_datafile_backup_age', undef,
+      'Age in hours of the latest datafile backup' ],
+  ['server::instance::rman::rman_archivelog_backup_age',
+      'rman_archivelog_backup_age', undef,
+      'Age in hours of the latest archivelog backup' ],
   ['server::instance::sga::databuffer::hitratio',
       'sga-data-buffer-hit-ratio', undef,
       'Data Buffer Cache Hit Ratio' ],
@@ -305,6 +305,10 @@ EOUS
        turns on autocommit for the dbd::oracle module
     --noperfdata
        do not output performance data
+    --target [primary*|standby|all]
+       defines which database role is expected.in mode rman_datatafile_backup_age 
+       or rman_archivelog_backup_age - when role is different than target, no 
+       alarm will be raised. Default is primary.
 
   Tablespace-related modes check all tablespaces in one run by default.
   If only a single tablespace should be checked, use the --name parameter.
@@ -422,7 +426,8 @@ my @params = (
     "labelformat=s",
     "uniquelabels",
     "morphmessage=s%",
-    "extra-opts:s");
+    "extra-opts:s",
+    "target=s");
 
 if (! GetOptions(\%commandline, @params)) {
   print_help();
@@ -572,6 +577,17 @@ if (exists $commandline{runas}) {
           $important_env, $ENV{$important_env} if $DBD::Oracle::Server::verbose;
     }
   }
+}
+
+if (exists $commandline{target}) {
+  $commandline{target} = lc $commandline{target};
+  if ($commandline{target} !~ /^(primary|standby|all)$/) {
+    printf "Parameter target must be primary (default), standby or all\n";
+    print_help();
+    exit $ERRORS{UNKNOWN};
+  }
+} else {
+  $commandline{target} = "primary";
 }
 
 if ($needs_restart) {
@@ -750,6 +766,7 @@ my %params = (
     uniquelabels => $commandline{uniquelabels},
     morphmessage => $commandline{morphmessage},
     negate => $commandline{negate},
+    target => $commandline{target},
 );
 
 my $server = undef;

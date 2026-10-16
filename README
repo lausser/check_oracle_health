@@ -21,8 +21,7 @@ You can check for the latest plugin at:
 
 The documentation in this README covers only the most common features.
 To view the full documentation and examples, go to 
-  http://www.consol.com/opensource/nagios/check-oracle-health or
-  http://www.consol.de/opensource/nagios/check-oracle-health
+  https://omd.consol.de/docs/plugins/check_oracle_health
 
 Send mail to gerhard.lausser@consol.de for assistance.
 Please include the OS type/version and the Perl DBI/DBD version

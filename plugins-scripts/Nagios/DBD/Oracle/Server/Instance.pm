@@ -80,57 +80,91 @@ sub init {
         AND
           start_time > sysdate-3
     });
-  } elsif ($params{mode} =~ /server::instance::rman::full_backup_age/) {
-    $self->{full_backup_age} = $self->{handle}->fetchrow_array(q{
-        WITH age AS (
-          SELECT MAX(age) age
-          FROM (
-            SELECT
-              vdf.file#,
-              TRUNC(TO_NUMBER(SYSDATE - MAX(NVL(vbd.checkpoint_time, vdf.creation_time))) * 24) age
-            FROM v$backup_datafile vbd
-            RIGHT OUTER JOIN v$datafile vdf ON vbd.file# = vdf.file#
-            WHERE vdf.enabled <> 'READ ONLY'
-            GROUP BY vdf.file#
-          )
-        ),
-        backup_running AS (
-          SELECT COUNT(*) count
+  } elsif ($params{mode} =~ /server::instance::rman::rman_datafile_backup_age/) {
+    # check if database role is equal to expected role
+    my $target = $params{target} || 'primary';
+    $self->{target} = $target;
+    $self->{database_role} = $self->{handle}->fetchrow_array(q{
+        SELECT database_role FROM v$database
+    });
+    if (! defined $self->{database_role}) {
+      $self->add_nagios_critical("unable to get database role");
+    } else {
+       my $is_primary = ($self->{database_role} eq 'PRIMARY');
+      if (($target eq 'primary' && ! $is_primary) || ($target eq 'standby' && $is_primary)) {
+        $self->{rman_datafile_backup_age_skipped} = 1;
+        $self->{rman_datafile_backup_age} = 0;
+      } else {
+        # check if backup is currently running
+        # only include backups started within the last 2 days
+        $self->{backup_running} = $self->{handle}->fetchrow_array(q{
+          SELECT 
+            COUNT(*) backup_running
           FROM v$rman_status
           WHERE status = 'RUNNING'
-            AND operation = 'BACKUP'
-            AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
-        )
-        SELECT CASE
-          WHEN backup_running.count > 0 THEN 0
-          WHEN vd.database_role <> 'PRIMARY' THEN 0
-          ELSE age.age
-        END backup_age
-        FROM age, backup_running, v$database vd
+          AND operation = 'BACKUP'
+          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
+          AND start_time > sysdate-2
+        });
+        if ($self->{backup_running} >= 1) {
+          $self->{rman_datafile_backup_age} = 0;
+        } else {
+          $self->{rman_datafile_backup_age} = $self->{handle}->fetchrow_array(q{
+            SELECT MAX(age) age
+            FROM (
+              SELECT
+                vdf.file#,
+                TRUNC(TO_NUMBER(SYSDATE - MAX(NVL(vbd.checkpoint_time, vdf.creation_time))) * 24) age
+              FROM v$backup_datafile vbd
+              RIGHT OUTER JOIN v$datafile vdf ON vbd.file# = vdf.file#
+              WHERE vdf.enabled <> 'READ ONLY'
+              GROUP BY vdf.file#
+              )
+          });
+        }
+      }
+    }
+  } elsif ($params{mode} =~ /server::instance::rman::rman_archivelog_backup_age/) {
+    # check if database role is equal to expected role
+    my $target = $params{target} || 'primary';
+    $self->{target} = $target;
+    $self->{database_role} = $self->{handle}->fetchrow_array(q{
+        SELECT database_role FROM v$database
     });
-  } elsif ($params{mode} =~ /server::instance::rman::arch_backup_age/) {
-    $self->{arch_backup_age} = $self->{handle}->fetchrow_array(q{
-        WITH arch_backup_age AS (
-          SELECT TRUNC(TO_NUMBER(SYSDATE - MIN(next_time)) * 24) age
-          FROM v$archived_log
-          WHERE backup_count = 0
-            AND deleted = 'NO'
-            AND standby_dest = 'NO'
-            AND archived = 'YES'
-        ),
-        backup_running AS (
-          SELECT COUNT(*) count
+    if (! defined $self->{database_role}) {
+      $self->add_nagios_critical("unable to get database role");
+    } else {
+      my $is_primary = ($self->{database_role} eq 'PRIMARY');
+      if (($target eq 'primary' && ! $is_primary) || ($target eq 'standby' && $is_primary)) {
+        $self->{rman_archivelog_backup_age_skipped} = 1;
+        $self->{rman_archivelog_backup_age} = 0;
+      } else {
+        # check if backup is currently running
+        # only include backups started within the last 2 days
+        $self->{backup_running} = $self->{handle}->fetchrow_array(q{
+          SELECT 
+            COUNT(*) backup_running
           FROM v$rman_status
           WHERE status = 'RUNNING'
-            AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL', 'ARCHIVELOG')
-        )
-        SELECT CASE
-          WHEN backup_running.count > 0 THEN 0
-          WHEN vd.database_role <> 'PRIMARY' THEN 0
-          ELSE NVL(arch_backup_age.age, 0)
-        END arch_backup_age
-        FROM arch_backup_age, backup_running, v$database vd
-    });
+          AND operation = 'BACKUP'
+          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
+          AND start_time > sysdate-2
+        });
+        if ($self->{backup_running} >= 1) {
+          $self->{rman_archivelog_backup_age} = 0;
+        } else {
+          $self->{rman_archivelog_backup_age} = $self->{handle}->fetchrow_array(q{
+            SELECT 
+              NVL(TRUNC(TO_NUMBER(SYSDATE - MIN(next_time)) * 24),0) age
+            FROM v$archived_log
+            WHERE backup_count = 0
+              AND deleted = 'NO'
+              AND standby_dest = 'NO'
+              AND archived = 'YES'
+          });
+        }
+      }
+    }
   } elsif ($params{mode} =~ /server::instance::processusage/) {
     $self->{process_usage} = $self->{handle}->fetchrow_array(q{
         SELECT current_utilization/limit_value*100 
@@ -227,21 +261,27 @@ sub nagios {
       $self->add_perfdata(sprintf "rman_backup_problems=%d;%d;%d",
           $self->{rman_backup_problems},
           $self->{warningrange}, $self->{criticalrange});
-  } elsif ($params{mode} =~ /server::instance::rman::full_backup_age/) {
+  } elsif ($params{mode} =~ /server::instance::rman::rman_datafile_backup_age/) {
       $self->add_nagios(
-          $self->check_thresholds($self->{full_backup_age}, 28, 32),
-          sprintf "%d hours since the last successful database backup",
-              $self->{full_backup_age});
-      $self->add_perfdata(sprintf "full_backup_age=%d;%s;%s",
-          $self->{full_backup_age},
+          $self->check_thresholds($self->{rman_datafile_backup_age}, 28, 32),
+          $self->{rman_datafile_backup_age_skipped} ?
+              sprintf("database role is %s, target is %s: backup age not checked",
+                  lc $self->{database_role}, $self->{target}) :
+              sprintf("%d hours since the last successful rman datafile backup",
+                  $self->{rman_datafile_backup_age}));
+      $self->add_perfdata(sprintf "rman_datafile_backup_age=%d;%s;%s",
+          $self->{rman_datafile_backup_age},
           $self->{warningrange}, $self->{criticalrange});
-  } elsif ($params{mode} =~ /server::instance::rman::arch_backup_age/) {
+  } elsif ($params{mode} =~ /server::instance::rman::rman_archivelog_backup_age/) {
       $self->add_nagios(
-          $self->check_thresholds($self->{arch_backup_age}, 4, 8),
-          sprintf "%d hours since the last successful archivelog backup",
-              $self->{arch_backup_age});
-      $self->add_perfdata(sprintf "arch_backup_age=%d;%s;%s",
-          $self->{arch_backup_age},
+          $self->check_thresholds($self->{rman_archivelog_backup_age}, 4, 8),
+          $self->{rman_archivelog_backup_age_skipped} ?
+              sprintf("database role is %s, target is %s: backup age not checked",
+                  lc $self->{database_role}, $self->{target}) :
+              sprintf("%d hours since the last successful rman archivelog backup",
+                  $self->{rman_archivelog_backup_age}));
+      $self->add_perfdata(sprintf "rman_archivelog_backup_age=%d;%s;%s",
+          $self->{rman_archivelog_backup_age},
           $self->{warningrange}, $self->{criticalrange});
   } elsif ($params{mode} =~ /server::instance::session::usage/) {
       $self->{session_usage} =
