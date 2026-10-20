@@ -82,11 +82,13 @@ sub init {
     });
   } elsif ($params{mode} =~ /server::instance::rman::datafile::backup::age/) {
     # necessary grants:
-    # GRANT SELECT ON v$database TO nagios;
-    # GRANT SELECT ON v$rman_status TO nagios;
-    # GRANT SELECT ON v$backup_datafile to nagios;
-    # GRANT SELECT ON v$datafile to nagios;
-    # GRANT SELECT ON v$backup_piece to nagios;
+    # GRANT select_catalog_role TO nagios;
+    # OR:
+    # GRANT SELECT ON v_$database TO nagios;
+    # GRANT SELECT ON v_$rman_status TO nagios;
+    # GRANT SELECT ON v_$backup_datafile to nagios;
+    # GRANT SELECT ON v_$datafile to nagios;
+    # GRANT SELECT ON v_$backup_piece to nagios;
     
     # check if database role is equal to expected role
     my $target = $params{target} || 'primary';
@@ -141,9 +143,11 @@ sub init {
     }
   } elsif ($params{mode} =~ /server::instance::rman::archivelog::backup::age/) {
     # necessary grants:
-    # GRANT SELECT ON v$database TO nagios;
-    # GRANT SELECT ON v$rman_status TO nagios;
-    # GRANT SELECT ON v$archived_log TO nagios;
+    # GRANT select_catalog_role TO nagios;
+    # OR:
+    # GRANT SELECT ON v_$database TO nagios;
+    # GRANT SELECT ON v_$rman_status TO nagios;
+    # GRANT SELECT ON v_$archived_log TO nagios;
     
     # check if database role is equal to expected role
     my $target = $params{target} || 'primary';
@@ -289,7 +293,7 @@ sub nagios {
                   lc $self->{database_role}, $self->{target}) :
               sprintf("%d hours since the last successful rman datafile backup",
                   $self->{rman_datafile_backup_age}));
-      if (($self->{rman_archivelog_backup_age_skipped} || 0) != 1) {
+      if (($self->{rman_datafile_backup_age_skipped} || 0) != 1) {
           $self->add_perfdata(sprintf "rman_datafile_backup_age=%d;%s;%s",
             $self->{rman_datafile_backup_age},
             $self->{warningrange}, $self->{criticalrange});

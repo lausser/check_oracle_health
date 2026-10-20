@@ -306,8 +306,8 @@ EOUS
     --noperfdata
        do not output performance data
     --target [primary*|standby|all]
-       defines which database role is expected.in mode rman-datatafile-backup-age 
-       or rman-archivelog-backup-age - when role is different than target, no 
+       defines which database role is expected. In mode rman-datatafile-backup-age 
+       or rman-archivelog-backup-age when role is different than target, no 
        alarm will be raised. Default is primary.
 
   Tablespace-related modes check all tablespaces in one run by default.
