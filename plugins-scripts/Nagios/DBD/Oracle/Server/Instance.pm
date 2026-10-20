@@ -80,7 +80,14 @@ sub init {
         AND
           start_time > sysdate-3
     });
-  } elsif ($params{mode} =~ /server::instance::rman::rman_datafile_backup_age/) {
+  } elsif ($params{mode} =~ /server::instance::rman::datafile::backup::age/) {
+    # necessary grants:
+    # GRANT SELECT ON v$database TO nagios;
+    # GRANT SELECT ON v$rman_status TO nagios;
+    # GRANT SELECT ON v$backup_datafile to nagios;
+    # GRANT SELECT ON v$datafile to nagios;
+    # GRANT SELECT ON v$backup_piece to nagios;
+    
     # check if database role is equal to expected role
     my $target = $params{target} || 'primary';
     $self->{target} = $target;
@@ -103,7 +110,7 @@ sub init {
           FROM v$rman_status
           WHERE status = 'RUNNING'
           AND operation = 'BACKUP'
-          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
+          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL', 'ARCHIVELOG')
           AND start_time > sysdate-2
         });
         if ($self->{backup_running} >= 1) {
@@ -117,14 +124,22 @@ sub init {
                 TRUNC(TO_NUMBER(SYSDATE - MAX(NVL(vbd.checkpoint_time, vdf.creation_time))) * 24) age
               FROM v$backup_datafile vbd
               RIGHT OUTER JOIN v$datafile vdf ON vbd.file# = vdf.file#
+              INNER JOIN v$backup_piece vbp ON vbd.set_stamp = vbp.set_stamp AND vbd.set_count = vbp.set_count
               WHERE vdf.enabled <> 'READ ONLY'
+                AND vbp.deleted='NO'
+                AND vbp.status='A'
               GROUP BY vdf.file#
               )
           });
         }
       }
     }
-  } elsif ($params{mode} =~ /server::instance::rman::rman_archivelog_backup_age/) {
+  } elsif ($params{mode} =~ /server::instance::rman::archivelog::backup::age/) {
+    # necessary grants:
+    # GRANT SELECT ON v$database TO nagios;
+    # GRANT SELECT ON v$rman_status TO nagios;
+    # GRANT SELECT ON v$archived_log TO nagios;
+    
     # check if database role is equal to expected role
     my $target = $params{target} || 'primary';
     $self->{target} = $target;
@@ -147,7 +162,7 @@ sub init {
           FROM v$rman_status
           WHERE status = 'RUNNING'
           AND operation = 'BACKUP'
-          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
+          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL', 'ARCHIVELOG')
           AND start_time > sysdate-2
         });
         if ($self->{backup_running} >= 1) {
@@ -261,7 +276,7 @@ sub nagios {
       $self->add_perfdata(sprintf "rman_backup_problems=%d;%d;%d",
           $self->{rman_backup_problems},
           $self->{warningrange}, $self->{criticalrange});
-  } elsif ($params{mode} =~ /server::instance::rman::rman_datafile_backup_age/) {
+  } elsif ($params{mode} =~ /server::instance::rman::datafile::backup::age/) {
       $self->add_nagios(
           $self->check_thresholds($self->{rman_datafile_backup_age}, 28, 32),
           $self->{rman_datafile_backup_age_skipped} ?
@@ -269,10 +284,12 @@ sub nagios {
                   lc $self->{database_role}, $self->{target}) :
               sprintf("%d hours since the last successful rman datafile backup",
                   $self->{rman_datafile_backup_age}));
-      $self->add_perfdata(sprintf "rman_datafile_backup_age=%d;%s;%s",
-          $self->{rman_datafile_backup_age},
-          $self->{warningrange}, $self->{criticalrange});
-  } elsif ($params{mode} =~ /server::instance::rman::rman_archivelog_backup_age/) {
+      if (($self->{rman_archivelog_backup_age_skipped} || 0) != 1) {
+          $self->add_perfdata(sprintf "rman_datafile_backup_age=%d;%s;%s",
+            $self->{rman_datafile_backup_age},
+            $self->{warningrange}, $self->{criticalrange});
+      }
+  } elsif ($params{mode} =~ /server::instance::rman::archivelog::backup::age/) {
       $self->add_nagios(
           $self->check_thresholds($self->{rman_archivelog_backup_age}, 4, 8),
           $self->{rman_archivelog_backup_age_skipped} ?
@@ -280,9 +297,11 @@ sub nagios {
                   lc $self->{database_role}, $self->{target}) :
               sprintf("%d hours since the last successful rman archivelog backup",
                   $self->{rman_archivelog_backup_age}));
-      $self->add_perfdata(sprintf "rman_archivelog_backup_age=%d;%s;%s",
-          $self->{rman_archivelog_backup_age},
-          $self->{warningrange}, $self->{criticalrange});
+      if (($self->{rman_archivelog_backup_age_skipped} || 0) != 1) {
+          $self->add_perfdata(sprintf "rman_archivelog_backup_age=%d;%s;%s",
+            $self->{rman_archivelog_backup_age},
+            $self->{warningrange}, $self->{criticalrange});
+      }
   } elsif ($params{mode} =~ /server::instance::session::usage/) {
       $self->{session_usage} =
           $DBD::Oracle::Server::Instance::Session::session_usage;
