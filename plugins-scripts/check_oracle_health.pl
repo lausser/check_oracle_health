@@ -306,7 +306,7 @@ EOUS
     --noperfdata
        do not output performance data
     --target [primary*|standby|all]
-       defines which database role is expected. In mode rman-datatafile-backup-age 
+       defines which database role is expected. In mode rman-datafile-backup-age 
        or rman-archivelog-backup-age when role is different than target, no 
        alarm will be raised. Default is primary.
 
