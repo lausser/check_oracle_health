@@ -1,3 +1,8 @@
+* 3.3.4 - 2026-10-20
+  add modes rman-datafile-backup-age, rman-archivelog-backup-age with
+  option --target primary|standby|all (Thanks Benjamin Kurschies)
+  add mode container-tablespace-usage (Thanks Benjamin Kurschies)
+  allow CDB common users (C##...) and $ in user@sysdba (Thanks Benjamin Kurschies)
 * 3.3.3.2 - 2024-01-08
   bugfix in uptime
 * 3.3.3.1 - 2024-01-08
