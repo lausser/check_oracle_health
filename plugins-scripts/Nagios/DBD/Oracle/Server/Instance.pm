@@ -121,15 +121,20 @@ sub init {
             FROM (
               SELECT
                 vdf.file#,
-                TRUNC(TO_NUMBER(SYSDATE - MAX(NVL(vbd.checkpoint_time, vdf.creation_time))) * 24) age
-              FROM v$backup_datafile vbd
-              RIGHT OUTER JOIN v$datafile vdf ON vbd.file# = vdf.file#
-              INNER JOIN v$backup_piece vbp ON vbd.set_stamp = vbp.set_stamp AND vbd.set_count = vbp.set_count
+                TRUNC(TO_NUMBER(SYSDATE - MAX(NVL(b.checkpoint_time, vdf.creation_time))) * 24) age
+              FROM v$datafile vdf
+              LEFT OUTER JOIN (
+                SELECT 
+                   vbd.file#
+                  ,vbd.checkpoint_time
+                FROM v$backup_datafile vbd
+                INNER JOIN v$backup_piece vbp ON vbd.set_stamp = vbp.set_stamp AND vbd.set_count = vbp.set_count
+                WHERE vbp.status = 'A' 
+                  AND vbp.deleted = 'NO'
+              ) b ON b.file# = vdf.file#
               WHERE vdf.enabled <> 'READ ONLY'
-                AND vbp.deleted='NO'
-                AND vbp.status='A'
               GROUP BY vdf.file#
-              )
+            ) 
           });
         }
       }
