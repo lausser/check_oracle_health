@@ -110,7 +110,7 @@ sub init {
           FROM v$rman_status
           WHERE status = 'RUNNING'
           AND operation = 'BACKUP'
-          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL', 'ARCHIVELOG')
+          AND object_type IN ('DB INCR', 'DB FULL', 'DATAFILE INCR', 'DATAFILE FULL')
           AND start_time > sysdate-2
         });
         if ($self->{backup_running} >= 1) {
